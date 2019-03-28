@@ -1,44 +1,58 @@
-require(dplyr)
-require(ggplot2)
-require(tidyr)
-require(gridExtra)
-require(cowplot)
-require(readr)
-require(optparse)
+#!/usr/bin/env Rscript
+
+library(tidyverse)
+library(gridExtra)
+library(cowplot)
 
 ##############################################################
 #### Load command line options and set global parameters
 ##############################################################
 
-option_list = list(
-  make_option(c("-i", "--input"), type="character", default=NULL, 
-              help="Input file prefix. Expects to find the files <input>.metadata.tsv and <input>.measurement.tsv", metavar="input.csv"),
-  make_option(c("-o", "--output"), type="character", default="", 
-              help="Output file prefix. Output files of the form <output>.* will be created. If this option is not provided the input file prefix will be used.", metavar="output_prefix")
+###### Set to true for stepping through code in RStudio! #####
+rstudio_test_mode = F
+rstudio_test_prefix = "igem001" #used for both input and output prefixes
+############################################################
+
+if (!rstudio_test_mode) {
+  require(optparse)
+  option_list = list(
+    make_option(c("-i", "--input"), type="character", default=NULL, 
+                help="Input file prefix. Expects to find the files <input>.metadata.tsv and <input>.measurement.tsv", metavar="input.csv"),
+    make_option(c("-o", "--output"), type="character", default=NULL, 
+                help="Output file prefix. Output files of the form <output>.* will be created. If this option is not provided the input file prefix will be used.", metavar="output_prefix")
+    
+    #TODO: We need to make more options accessible at the command line
+  )
   
-  #TODO: We need to make more options accessible at the command line
+  usage_string = paste(
+    "burden.R -i input -o output\n\n",
+    sep = ""
+  ) 
   
-)
-
-usage_string = paste(
-  "burden.R -i input -o output\n\n",
-  sep = ""
-) 
-
-opt_parser = OptionParser(usage=usage_string, option_list=option_list);
-opt = parse_args(opt_parser);
-
-if (is.null(opt$input)) {
-  print_help(opt_parser)
-  stop("You must supply the -i|--input argument for the input", call.=FALSE)
-}
-input.prefix = opt$input
-
-if (is.null(opt$output)) {
-  output.prefix = input.prefix
+  opt_parser = OptionParser(usage=usage_string, option_list=option_list);
+  opt = parse_args(opt_parser);
+  
+  if (is.null(opt$input)) {
+    print_help(opt_parser)
+    stop("You must supply the -i|--input argument for the input", call.=FALSE)
+  }
+  input.prefix = opt$input
+  
+  if (is.null(opt$output)) {
+    output.prefix = input.prefix
+  } else {
+    output.prefix = opt$output
+  }
+  
 } else {
-  output.prefix = opt$output
+  # test mode
+  input.prefix = rstudio_test_prefix
+  output.prefix = rstudio_test_prefix
 }
+
+
+cat("Input prefix: ", input.prefix, "\n")
+cat("Output prefix: ", output.prefix, "\n")
 
 #Create the plot directory
 plot.directory = paste0(output.prefix, "-plots")
@@ -69,10 +83,12 @@ time.point.delta = floor(time.point.span/2)
 #SPL Note: had to run "dos2unix" to clean up the file from our platreader before it could be read properly. Not sure how to fix this on the windows end.
 #TODO: Check for incorrect line endings and warn user
 
-all_data <- read_tsv(paste0(input.prefix, ".platereader.tsv"), col_names=T, comment = "#" )
+all_data <- read_tsv(paste0(input.prefix, ".measurements.tsv"), col_names=T, comment = "#" )
 
 #Remove row thats are NA in time (this is the trialing trash data). 
 #Remove "s" and convert to integer, remove row that dont convert properly and leave NA
+all_data = all_data %>% rename(Time=X1) %>% select(-X98)
+
 all_data$Time <- str_replace(all_data$Time, "s", "")
 all_data$Time <- as.integer(all_data$Time)
 all_data <- na.omit (all_data)
@@ -87,25 +103,38 @@ reading.names = c("OD", "GFP", "other")
 
 tidy_all = data.frame()
 
+
+## Need to keep all times in lock step despite some rounding
+## so we use the first chunk times
+definitive_times = c()
+
 for(i in 1:(length(zeros)-1)) {
   
   this.data.chunk = all_data[zeros[i]:(zeros[i+1]-1),]
   tidy.data.chunk <- gather(this.data.chunk, key = "well", value = "value", -Time)
   tidy.data.chunk$reading <- reading.names[i]
-  tidy.data.chunk = tidy.data.chunk %>% mutate(time.min = floor(Time/60))
+
+  if (i==1) {
+    definitive_times = floor(tidy.data.chunk$Time/60)
+  }
+  tidy.data.chunk$time.min = definitive_times
   tidy.data.chunk = tidy.data.chunk %>% select (-Time)
   tidy_all = tidy_all %>% bind_rows(tidy.data.chunk)
 }
 
-write_tsv( tidy_all, paste0(dataset.name, ".tidy.tsv"))
+write_tsv( tidy_all, paste0(output.prefix, ".tidy.tsv"))
 
 ##############################################################
 #### Load metadata file and tidy
 ##############################################################
 
 metadata <- read_tsv(paste0(input.prefix, ".metadata.tsv"), comment = "#")
-ignore.wells = metadata$well[(metadata$include==0 || metadata$include=="F")]
-metadata = metadata %>% filter(strain != "ignore")
+
+#convert booleans - ignore wells
+metadata$include = as.numeric(metadata$include)
+ignore.wells = metadata$well[metadata$include==0]
+metadata = metadata %>% filter(include==1)
+
 metadata$strain = paste0(metadata$strain, "__", metadata$isolate)
 metadata$strain = sub("blank__NA", "blank", metadata$strain)
 
@@ -127,7 +156,8 @@ Y = Y %>% filter(time.min != 0)
 
 # Analysis starts here ------->
 ##############################################################
-#### Backgroud Correction
+#### Background Correction
+#### * Subtracts the average of ALL blank wells at a given time from readings
 ##############################################################
 
 BG = Y %>% filter(strain=="blank")
@@ -167,15 +197,21 @@ if (length(readings) == 3) {
   Z$GFP = Z$GFP - Z$GFP.bg
 
 }
-
+#Ditch the blanks here
 Z = Z %>% filter(strain != "blank")
 
+#For debugging
 #write_tsv(Z, "temp.tsv")
 
-##### AVERAGE OFFSET CORRECTION
+##############################################################
+#### Average Per-Sample Offset Correction
+#### * Equalizes the beginning of each curve for a given strain
+####   This is a kludge to correct for well-to-well background differences
+####   TODO:  figure out a way to experimentally measure these differences!
+##############################################################
 if (offset.readings.to.average) {
   
-  cat("Offsetting to average measured values")
+  cat("Offsetting to average measured values\n")
   
   #calculate the average over all times for a sample
   if (length(readings) == 2) {
@@ -206,17 +242,16 @@ if (offset.readings.to.average) {
 }
 
 
-#Now let's add the background as new columns to our data of interest and subtract these values from those columns. Then, graph again.
+##############################################################
+#### Calculate and graph rates per strain
+##############################################################
+
 
 Z = Z %>% filter (OD >= minimum.OD)
-
-
 final.table = data.frame()
-
-#loop over all of the strains except "Blank"
 for (strain.of.interest in unique(Z$strain) )
 {
-  cat("STRAIN:", strain.of.interest) 
+  cat("STRAIN:", strain.of.interest, "\n") 
   strain.data = Z %>% filter(strain==strain.of.interest)
   head(Z)
   
@@ -252,8 +287,6 @@ for (strain.of.interest in unique(Z$strain) )
   
   growth.rate.data = growth.rate.data %>% mutate(time.min = (t1+t2)/2)
   growth.rate.data = growth.rate.data %>% mutate(specific.growth.rate = 60 * (logOD.t2 - logOD.t1) /  (t2 - t1))
-  
-  
   
   plot1 = ggplot(growth.rate.data , aes(time.min, specific.growth.rate, color=well)) +  geom_point() 
 
@@ -398,7 +431,7 @@ for (strain.of.interest in unique(Z$strain) )
 final.table$replicate = sub("^.+__", "", final.table$strain, perl = T)
 final.table$strain = sub("__.+$", "", final.table$strain, perl = T)
 
-write_tsv(final.table, paste0(dataset.name, ".rates.summary.tsv"))
+write_tsv(final.table, paste0(output.prefix, ".rates.summary.tsv"))
 
 # Need to fix output of fit in each well
 #write_tsv(strain.max.values, paste0(dataset.name, ".rates.perwell.tsv"))
