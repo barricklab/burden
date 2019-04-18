@@ -20,11 +20,9 @@ Column Descriptions:
 * **well** - column (letter) and row (number) of the well on the microplate
 * **include** - whether to include this well in the analysis. 0/F/false = no, 1/T/true= yes
 * **strain** - the strain/construct that was placed in that well. You _cannot_ use a double underscore "__" in strain names!
+** Use **blank** in the **strain** column for wells that contain only medium and no cells.
 * **isolate** - number or letter designating different versions of the same strain. For example, different colonies picked after a transformation that might have genetic differences in the plasmids/chromosomes. Different values here represent different _biological replicates_ for a given construct. You do not need to fill in this column for **blanks**.
  **description** - _optional_ column with additional information
-
- Special Values:
- * Use **blank** in the **strain** column for well that contain only medium and no cells.
 
 Example excerpt from a file showing different types of data and formats:
 ```text
