@@ -8,9 +8,10 @@ library(cowplot)
 #### Load command line options and set global parameters
 ##############################################################
 
-###### Set to true for stepping through code in RStudio! #####
-rstudio_test_mode = F
-rstudio_test_prefix = "igem001" #used for both input and output prefixes
+#Run these two commands in Rstudio and then you can execute the script!
+#rstudio_test_mode = T
+#rstudio_test_prefix = "exp005" #used for both input and output prefixes
+
 ############################################################
 
 if (!rstudio_test_mode) {
@@ -63,7 +64,7 @@ readings = c("OD", "GFP")
 
 # Fix all initial measurements to be equal across all non-blank samples in a category
 offset.readings.to.average = T
-offset.readings.to.average.time.span = c(0,100000)
+offset.readings.to.average.time.span = c(0,60)
 
 ### Advanced options below
 
@@ -73,7 +74,7 @@ maximum.time = 250
 
 # time.point.span should be an odd number 
 # time.point.delta is the number of points forward and back to use in the window for determining rates
-time.point.span = 5
+time.point.span = 3
 time.point.delta = floor(time.point.span/2)
 
 ##############################################################
@@ -87,7 +88,7 @@ all_data <- read_tsv(paste0(input.prefix, ".measurements.tsv"), col_names=T, com
 
 #Remove row thats are NA in time (this is the trialing trash data). 
 #Remove "s" and convert to integer, remove row that dont convert properly and leave NA
-all_data = all_data %>% rename(Time=X1) %>% select(-X98)
+all_data = all_data %>% rename(Time=X1)
 
 all_data$Time <- str_replace(all_data$Time, "s", "")
 all_data$Time <- as.integer(all_data$Time)
@@ -122,6 +123,7 @@ for(i in 1:(length(zeros)-1)) {
   tidy_all = tidy_all %>% bind_rows(tidy.data.chunk)
 }
 
+tidy_all = tidy_all %>% filter(value != "Overflow") 
 write_tsv( tidy_all, paste0(output.prefix, ".tidy.tsv"))
 
 ##############################################################
@@ -146,6 +148,7 @@ metadata$strain = sub("blank__NA", "blank", metadata$strain)
 X = tidy_all
 X = X%>% filter(time.min < maximum.time)
 X = X %>% filter(!(well %in% ignore.wells))
+X$value=as.numeric(X$value)
 Y = X %>% spread(reading, value)
 
 #join sample data to master tidy data
@@ -159,6 +162,9 @@ Y = Y %>% filter(time.min != 0)
 #### Background Correction
 #### * Subtracts the average of ALL blank wells at a given time from readings
 ##############################################################
+
+Y$GFP = as.numeric(Y$GFP)
+Y$OD = as.numeric(Y$OD)
 
 BG = Y %>% filter(strain=="blank")
 
