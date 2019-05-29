@@ -12,12 +12,16 @@
 #      input.prefix = "my_exp"
 #
 # 2) Set the working directory to a folder on your computer
-#    that contains files 'input.prefix.measurements.tsv' and
-#    'input.prefix.metadata.tsv'
+#    that contains comma separated value (CSV) input files. 
+#    It should have a "measurements file saved from the 
+#    platereader and metadata file that you created that
+#    describes the samples (see full docs for format)
+#    beginning with your prefix:
+#    
+#       'input.prefix.measurements.csv'
+#       'input.prefix.metadata.csv'
 #
-#   Expects these files to exist:
-#      my_exp.measurements.tsv
-#      my_exp.metadata.tsv
+#     You can also use tab-separated value (TSV) files that end in *.tsv
 #
 # 3) Set any of these variables ahead of time to override the defaults.
 #
@@ -115,13 +119,22 @@ time.point.delta = floor(time.point.span/2)
 #### Load measurement file and tidy
 ##############################################################
 
-#SPL Note: had to run "dos2unix" to clean up the file from our platreader before it could be read properly. Not sure how to fix this on the windows end.
+#SPL Note: had to run "dos2unix" to clean up the file from our platereader before it could be read properly. Not sure how to fix this on the windows end.
 #TODO: Check for incorrect line endings and warn user
 
-all_data <- read_tsv(paste0(input.prefix, ".measurements.tsv"), col_names=F, comment = "#" )
+all_data = data.frame()
+
+if (file.exists(paste0(input.prefix, ".measurements.csv"))) {
+  all_data <- read_csv(paste0(input.prefix, ".measurements.csv"), col_names=F, comment = "#" )
+} else if (file.exists(paste0(input.prefix, ".measurements.tsv"))) {
+  all_data <- read_tsv(paste0(input.prefix, ".measurements.tsv"), col_names=F, comment = "#" )
+} else {
+  stop(paste0("Could not find a valid measurements file. Tried:\n", paste0(input.prefix, ".measurements.csv"), "\n", paste0(input.prefix, ".measurements.tsv")))
+}
+
 
 if (all_data$X1[1] == "0s") {
-  names(all_data) = c("Time", 
+  names(all_data) = c("Time",
                       "A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9", "A10", "A11", "A12",
                       "B1", "B2", "B3", "B4", "B5", "B6", "B7", "B8", "B9", "B10", "B11", "B12",
                       "C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8", "C9", "C10", "C11", "C12",
@@ -182,7 +195,16 @@ write_tsv( tidy_all, paste0(output.prefix, ".tidy.tsv"))
 #### Load metadata file and tidy
 ##############################################################
 
-metadata <- read_tsv(paste0(input.prefix, ".metadata.tsv"), comment = "#")
+metadata <- data.frame()
+
+if (file.exists(paste0(input.prefix, ".metadata.csv"))) {
+  metadata <- read_csv(paste0(input.prefix, ".metadata.csv"), col_names=T, comment = "#" )
+} else if (file.exists(paste0(input.prefix, ".metadata.tsv"))) {
+  metadata <- read_tsv(paste0(input.prefix, ".metadata.tsv"), col_names=T, comment = "#" )
+} else {
+  stop(paste0("Could not find a valid measurements file. Tried:\n", paste0(input.prefix, ".measurements.csv"), "\n", paste0(input.prefix, ".measurements.tsv")))
+}
+
 
 #convert booleans - ignore wells
 metadata$include = as.numeric(metadata$include)
@@ -503,8 +525,8 @@ for (strain.of.interest in unique(Z$strain) )
 final.table$replicate = sub("^.+__", "", final.table$strain, perl = T)
 final.table$strain = sub("__.+$", "", final.table$strain, perl = T)
 
-write_tsv(final.table, paste0(output.prefix, ".rates.summary.tsv"))
+write_csv(final.table, paste0(output.prefix, ".rates.summary.csv"))
 
 # Need to fix output of fit in each well
-#write_tsv(strain.max.values, paste0(dataset.name, ".rates.perwell.tsv"))
+#write_tsv(strain.max.values, paste0(dataset.name, ".rates.perwell.csv"))
           

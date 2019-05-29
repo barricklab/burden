@@ -9,14 +9,14 @@
 #    skipped and you can run this script within RStudio!
 #
 #    Example command
-#    input.file.string = "input1.tsv,input2.tsv"
+#    input.file.string = "input1.csv,input2.csv"
 #
 # 2) Set the working directory to a folder on your computer
-#    that contains files 'input1.tsv' and 'input2.tsv'
+#    that contains files 'input1.csv' and 'input2.csv'
 #
 #   Expects these files to exist:
-#      input1.tsv
-#      input2.tsv
+#      input1.csv
+#      input2.csv
 #
 ##############################################################
 
@@ -63,7 +63,15 @@ readings = c("growth", "GFP")
 
 all.data = data.frame()
 for (this.file.name in input.file.names[[1]]) {
-  this.data <- read_tsv(this.file.name)
+  
+  if (tools::file_ext("this.file.name") == "csv") {
+    this.data <- read_csv(this.file.name)
+  } else if (tools::file_ext("this.file.name") == "tsv") {
+    this.data <- read_tsv(this.file.name)
+  } else {
+    stop(paste0("Unrecognized file extension (must be csv or tsv) for file: ", this.file.name))
+  }
+  
   if("graph" %in% colnames(this.data)) {
     this.data = this.data %>% filter(graph==1)
   }
