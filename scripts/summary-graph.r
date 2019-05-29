@@ -1,36 +1,58 @@
 #!/usr/bin/env Rscript
 
+##############################################################
+#
+# Using RStudio to run this code? Follow these steps:
+#
+# 1) Define the variable 'input.file.string' in your Rstudio shell 
+#    and then all of the command-line option code will be 
+#    skipped and you can run this script within RStudio!
+#
+#    Example command
+#    input.file.string = "input1.tsv,input2.tsv"
+#
+# 2) Set the working directory to a folder on your computer
+#    that contains files 'input1.tsv' and 'input2.tsv'
+#
+#   Expects these files to exist:
+#      input1.tsv
+#      input2.tsv
+#
+##############################################################
+
 require(dplyr)
 require(ggplot2)
 require(tidyr)
 require(gridExtra)
 require(cowplot)
 require(readr)
-
 require(optparse)
 
-option_list = list(
-  make_option(c("-i", "--input"), type="character", default=NULL, 
-              help="Input file. You may separate values by commas to analyze multiple input files together", metavar="input.csv")
-)
-
-usage_string = paste(
-  "summary-graph.R -i input1,input2,input3\n\n",
-  sep = ""
-) 
-
-opt_parser = OptionParser(usage=usage_string, option_list=option_list)
-opt = parse_args(opt_parser)
+if (!exists("input.file.string")) {
+  
+  option_list = list(
+    make_option(c("-i", "--input"), type="character", default=NULL, 
+                help="Input file. You may separate values by commas to analyze multiple input files together", metavar="input.csv")
+  )
+  
+  usage_string = paste(
+    "summary-graph.R -i input1,input2,input3\n\n",
+    sep = ""
+  ) 
+  
+  opt_parser = OptionParser(usage=usage_string, option_list=option_list)
+  opt = parse_args(opt_parser)
+  
+  if (is.null(opt$input)) {
+    print_help(opt_parser)
+    stop("You must supply the -i|--input argument for the input", call.=FALSE)
+  }
+  
+  input.file.string = opt$input
+}
 
 ## Allow loading of multiple different results
-input.file.names = strsplit(opt$input,",")
-
-## Alternative that pastes in expected file name
-##input.file.names = paste0(strsplit(opt$input, ","), ".rates.summary.tsv")
-
-
-#debug
-input.file.names = c("exp003.rates.summary.tsv","exp005.rates.summary.tsv")
+input.file.names = strsplit(input.file.string,",")
 
 ###
 # Special sample names for metadata
@@ -40,7 +62,7 @@ input.file.names = c("exp003.rates.summary.tsv","exp005.rates.summary.tsv")
 readings = c("growth", "GFP") 
 
 all.data = data.frame()
-for (this.file.name in input.file.names) {
+for (this.file.name in input.file.names[[1]]) {
   this.data <- read_tsv(this.file.name)
   if("graph" %in% colnames(this.data)) {
     this.data = this.data %>% filter(graph==1)
@@ -50,6 +72,8 @@ for (this.file.name in input.file.names) {
   #remove nongraphable ones
   
 }
+
+output.prefix= sub(".tsv", "", input.file.names[[1]][1])
 
 all.data$replicate=as.factor(all.data$replicate)
 
@@ -62,7 +86,7 @@ ggplot(all.data, aes_(x=as.name(paste0(readings[1], ".rate")), y=as.name(paste0(
   scale_y_continuous(limits = c(0, max(all.data$GFP.rate+all.data$GFP.rate.sd))) + 
   geom_abline(intercept=0, slope = 600/1.4)
 
-ggsave(sub(".tsv", ".pdf", input.file.names[1]))
+ggsave(paste0(output.prefix, ".pdf"))
 
 ## fit line and show entire range
 
@@ -75,20 +99,23 @@ fit_fixed_zero = lm(GFP.rate~growth.rate + 0, fit.data)
 slope_fixed_zero = coef(fit_fixed_zero)
 
 ggplot(all.data, aes_(x=as.name(paste0(readings[1], ".rate")), y=as.name(paste0(readings[2], ".rate")), color=as.name("strain"), shape=as.name("replicate")))  +
-  geom_errorbarh(aes(xmin=growth.rate-growth.rate.sd, xmax=growth.rate+growth.rate.sd)) +
-  geom_errorbar(aes(ymin=GFP.rate-GFP.rate.sd, ymax=GFP.rate+GFP.rate.sd)) + 
+  geom_errorbarh(aes(xmin=growth.rate-growth.rate.sd, xmax=growth.rate+growth.rate.sd), height=0) +
+  geom_errorbar(aes(ymin=GFP.rate-GFP.rate.sd, ymax=GFP.rate+GFP.rate.sd), width=0) + 
   geom_point(size=5)  +
   scale_x_continuous(limits = c(0, max(all.data$growth.rate+all.data$growth.rate.sd))) + 
   scale_y_continuous(limits = c(0, max(all.data$GFP.rate+all.data$GFP.rate.sd))) + 
   geom_abline(intercept=0, slope = slope_fixed_zero)
 
-ggsave(sub(".tsv", ".fixed_zero.pdf", input.file.names[1]))
+ggsave(paste0(output.prefix, ".fixed_zero.pdf"))
 
+
+all.data$replicate=factor(all.data$replicate, levels=c(1,levels(all.data$replicate)))
+all.data$replicate[is.na(all.data$replicate)] = 1
 
 all.data$replicate=as.factor(all.data$replicate)
 ggplot(all.data, aes_(x=as.name("strain"), y=as.name(paste0(readings[1], ".rate")), fill=as.name("replicate")))  +  geom_bar(size=3, stat="identity", position=position_dodge()) +
   geom_errorbar(aes(ymin=growth.rate-growth.rate.sd, ymax=growth.rate+growth.rate.sd), position=position_dodge()) + 
   scale_y_continuous(limits = c(0, max(all.data$growth.rate+all.data$growth.rate.sd))) + 
 
-ggsave(sub(".tsv", ".growth.rates.pdf", input.file.names[1]))
+ggsave(paste0(output.prefix, ".growth.rates.pdf"))
 

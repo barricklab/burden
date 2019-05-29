@@ -1,5 +1,31 @@
 #!/usr/bin/env Rscript
 
+##############################################################
+#
+# Using RStudio to run this code? Follow these steps:
+#
+# 1) Define the variable 'input.prefix' in your Rstudio shell 
+#    and then all of the command-line option code will be 
+#    skipped and you can run this script within RStudio!
+#
+#    Example command
+#      input.prefix = "my_exp"
+#
+# 2) Set the working directory to a folder on your computer
+#    that contains files 'input.prefix.measurements.tsv' and
+#    'input.prefix.metadata.tsv'
+#
+#   Expects these files to exist:
+#      my_exp.measurements.tsv
+#      my_exp.metadata.tsv
+#
+# 3) Set any of these variables ahead of time to override the defaults.
+#
+#    Example command
+#      max.method = 1
+#
+##############################################################
+
 library(tidyverse)
 library(gridExtra)
 library(cowplot)
@@ -8,19 +34,19 @@ library(cowplot)
 #### Load command line options and set global parameters
 ##############################################################
 
-#Run these two commands in Rstudio and then you can execute the script!
-#rstudio_test_mode = T
-#rstudio_test_prefix = "exp005" #used for both input and output prefixes
 
-############################################################
+## Defaults:
 
-if (!rstudio_test_mode) {
+
+if (!exists("input.prefix")) {
   require(optparse)
   option_list = list(
     make_option(c("-i", "--input"), type="character", default=NULL, 
                 help="Input file prefix. Expects to find the files <input>.metadata.tsv and <input>.measurement.tsv", metavar="input.csv"),
     make_option(c("-o", "--output"), type="character", default=NULL, 
-                help="Output file prefix. Output files of the form <output>.* will be created. If this option is not provided the input file prefix will be used.", metavar="output_prefix")
+                help="Output file prefix. Output files of the form <output>.* will be created. If this option is not provided the input file prefix will be used.", metavar="output_prefix"),
+    make_option(c("-m", "--max-method"), type="character", default=2, 
+                help="Maximum picking method. 1=pick max growth rate time and use other rates at this same time. 2=pick maximum value of each curve at whatever time it occurs (may be different for growth rate and for fluorescence)", metavar="output_prefix")
     
     #TODO: We need to make more options accessible at the command line
   )
@@ -47,8 +73,16 @@ if (!rstudio_test_mode) {
   
 } else {
   # test mode
-  input.prefix = rstudio_test_prefix
-  output.prefix = rstudio_test_prefix
+  input.prefix = input.prefix
+}
+
+
+if (!exists("output.prefix")) {
+  output.prefix = input.prefix
+}
+
+if (!exists("max.method")) {
+  max.method = 2
 }
 
 
@@ -84,11 +118,29 @@ time.point.delta = floor(time.point.span/2)
 #SPL Note: had to run "dos2unix" to clean up the file from our platreader before it could be read properly. Not sure how to fix this on the windows end.
 #TODO: Check for incorrect line endings and warn user
 
-all_data <- read_tsv(paste0(input.prefix, ".measurements.tsv"), col_names=T, comment = "#" )
+all_data <- read_tsv(paste0(input.prefix, ".measurements.tsv"), col_names=F, comment = "#" )
+
+if (all_data$X1[1] == "0s") {
+  names(all_data) = c("Time", 
+                      "A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9", "A10", "A11", "A12",
+                      "B1", "B2", "B3", "B4", "B5", "B6", "B7", "B8", "B9", "B10", "B11", "B12",
+                      "C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8", "C9", "C10", "C11", "C12",
+                      "D1", "D2", "D3", "D4", "D5", "D6", "D7", "D8", "D9", "D10", "D11", "D12",
+                      "E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8", "E9", "E10", "E11", "E12",
+                      "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12",
+                      "G1", "G2", "G3", "G4", "G5", "G6", "G7", "G8", "G9", "G10", "G11", "G12",
+                      "H1", "H2", "H3", "H4", "H5", "H6", "H7", "H8", "H9", "H10", "H11", "H12"
+                      )
+    
+    
+    
+} else {
+  names(all_data) = all_data[1,]
+  all_data = all_data[-1,]
+}
 
 #Remove row thats are NA in time (this is the trialing trash data). 
 #Remove "s" and convert to integer, remove row that dont convert properly and leave NA
-all_data = all_data %>% rename(Time=X1)
 
 all_data$Time <- str_replace(all_data$Time, "s", "")
 all_data$Time <- as.integer(all_data$Time)
@@ -259,7 +311,7 @@ for (strain.of.interest in unique(Z$strain) )
 {
   cat("STRAIN:", strain.of.interest, "\n") 
   strain.data = Z %>% filter(strain==strain.of.interest)
-  head(Z)
+  head(strain.data)
   
   ## graph
   
@@ -312,9 +364,13 @@ for (strain.of.interest in unique(Z$strain) )
   }
   
   fluorescence.data = fluorescence.data %>% filter(!is.na(t1) & !is.na(t2))
-  
   fluorescence.data = fluorescence.data %>% mutate(time.min = (t1+t2)/2)
   fluorescence.data = fluorescence.data %>% mutate(GFP.rate = (GFP.t2 - GFP.t1) / (t2 - t1) / OD)
+  
+  if (length(readings) == 3) {
+    fluorescence.data = fluorescence.data %>% mutate(other.rate = (other.t2 - other.t1) / (t2 - t1) / OD)
+    
+  }
   
   plot2 = ggplot(fluorescence.data , aes(time.min, GFP.rate, color=well)) +  geom_point() 
   if (length(readings) == 2) {
@@ -331,9 +387,6 @@ for (strain.of.interest in unique(Z$strain) )
   #ggplot(fluorescence.data , aes(time.min, GFP.rate, color=well)) + scale_x_continuous(limits = c(0, 400)) +  geom_point() 
   
   #ggplot(fluorescence.data , aes(time.min, BFP.rate, color=well)) + scale_x_continuous(limits = c(0, 400)) +  geom_point() 
-  
-  
-  
 
   growth.rate.data$well = droplevels(growth.rate.data$well)
   
@@ -355,18 +408,31 @@ for (strain.of.interest in unique(Z$strain) )
     
     cat("Max growth rate:", max.growth.rate.row$specific.growth.rate, "per hour\n")
     
-    max.GFP.fluorescence.data.row = fluorescence.data %>% filter(well == this.well) %>% filter(time.min == max.growth.rate.row$time.min[1])
+    if (max.method==1) {
+      max.GFP.fluorescence.data.row = fluorescence.data %>% filter(well == this.well) %>% filter(time.min == max.growth.rate.row$time.min[1])
+    } else {
+      
+      replicate.fluorescence.data = fluorescence.data %>% filter(well == this.well)
+      
+      max.GFP.fluorescence.data.row = replicate.fluorescence.data[which.max(replicate.fluorescence.data$GFP.rate),]
+    }
     
-    #replicate.fluorescence.data = fluorescence.data %>% filter(well == this.well)
+    cat("Time of GFP production rate:", max.GFP.fluorescence.data.row$time.min[1], "min\n")
+
+    cat("Max GFP production rate:", max.GFP.fluorescence.data.row$GFP.rate, "per hour\n")
     
-    #max.GFP.fluorescence.data.row = replicate.fluorescence.data[which.max(replicate.fluorescence.data$GFP.rate),]
-    
-    cat("Max GPF production:", max.GFP.fluorescence.data.row$GFP.rate, "per hour\n")
-    
-    #max.BFP.fluorescence.data.row = replicate.fluorescence.data[which.max(replicate.fluorescence.data$BFP.rate),]
+
     
     if (length(readings) == 3) {
-      max.other.fluorescence.data.row = fluorescence.data %>% filter(well == this.well) %>% filter(time.min == max.growth.rate.row$time.min[1])
+      
+      if (max.method==1) {
+        max.other.fluorescence.data.row = fluorescence.data %>% filter(well == this.well) %>% filter(time.min == max.growth.rate.row$time.min[1]) 
+      } else {
+        
+        max.other.fluorescence.data.row = replicate.fluorescence.data[which.max(replicate.fluorescence.data$other.rate),]
+        
+        max.GFP.fluorescence.data.row = replicate.fluorescence.data[which.max(replicate.fluorescence.data$other.rate),]
+      }
       
       cat("Max BPF production:", max.other.fluorescence.data.row$other.rate, "per hour\n")
     }
