@@ -64,10 +64,12 @@ readings = c("growth", "GFP")
 all.data = data.frame()
 for (this.file.name in input.file.names[[1]]) {
   
-  if (tools::file_ext("this.file.name") == "csv") {
+  if (tools::file_ext(this.file.name) == "csv") {
     this.data <- read_csv(this.file.name)
-  } else if (tools::file_ext("this.file.name") == "tsv") {
+    output.prefix= sub(".csv", "", input.file.names[[1]][1])
+  } else if (tools::file_ext(this.file.name) == "tsv") {
     this.data <- read_tsv(this.file.name)
+    output.prefix= sub(".tsv", "", input.file.names[[1]][1])
   } else {
     stop(paste0("Unrecognized file extension (must be csv or tsv) for file: ", this.file.name))
   }
@@ -76,12 +78,9 @@ for (this.file.name in input.file.names[[1]]) {
     this.data = this.data %>% filter(graph==1)
   }
   all.data = rbind(all.data, this.data)
-  
-  #remove nongraphable ones
-  
 }
 
-output.prefix= sub(".tsv", "", input.file.names[[1]][1])
+
 
 all.data$replicate=as.factor(all.data$replicate)
 
@@ -116,9 +115,9 @@ ggplot(all.data, aes_(x=as.name(paste0(readings[1], ".rate")), y=as.name(paste0(
 
 ggsave(paste0(output.prefix, ".fixed_zero.pdf"))
 
-
-all.data$replicate=factor(all.data$replicate, levels=c(1,levels(all.data$replicate)))
-all.data$replicate[is.na(all.data$replicate)] = 1
+#We need to convert NA replicates to a factor number.
+#all.data$replicate=factor(all.data$replicate, levels=c(1,levels(all.data$replicate)))
+#all.data$replicate[is.na(all.data$replicate)] = 1
 
 all.data$replicate=as.factor(all.data$replicate)
 ggplot(all.data, aes_(x=as.name("strain"), y=as.name(paste0(readings[1], ".rate")), fill=as.name("replicate")))  +  geom_bar(size=3, stat="identity", position=position_dodge()) +
