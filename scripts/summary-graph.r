@@ -28,6 +28,7 @@ require(gridExtra)
 require(cowplot)
 require(readr)
 require(optparse)
+require(xtable)
 
 if (!exists("input.file.string")) {
   
