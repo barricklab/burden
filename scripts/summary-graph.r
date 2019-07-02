@@ -53,11 +53,6 @@ if (!exists("input.file.string")) {
 ## Allow loading of multiple different results
 input.file.names = strsplit(input.file.string,",")
 
-###
-# Special sample names for metadata
-#  "blank" well will be used to create an average blank value
-#  "ignore" well will be removed before analysis
-
 readings = c("growth", "GFP") 
 
 all.data = data.frame()
@@ -81,7 +76,7 @@ for (this.file.name in input.file.names[[1]]) {
 
 
 
-all.data$replicate=as.factor(all.data$replicate)
+all.data$isolate=as.factor(all.data$isolate)
 
 ## fit line and show entire range
 
@@ -93,7 +88,7 @@ if("fit" %in% colnames(fit.data)) {
 fit_fixed_zero = lm(GFP.rate~growth.rate + 0, fit.data)
 slope_fixed_zero = coef(fit_fixed_zero)
 
-p = ggplot(all.data, aes_(x=as.name(paste0(readings[1], ".rate")), y=as.name(paste0(readings[2], ".rate")), color=as.name("strain"), shape=as.name("replicate")))  +
+p = ggplot(all.data, aes_(x=as.name(paste0(readings[1], ".rate")), y=as.name(paste0(readings[2], ".rate")), color=as.name("strain"), shape=as.name("isolate")))  +
   geom_errorbarh(aes(xmin=growth.rate-growth.rate.sd, xmax=growth.rate+growth.rate.sd), height=0) +
   geom_errorbar(aes(ymin=GFP.rate-GFP.rate.sd, ymax=GFP.rate+GFP.rate.sd), width=0) + 
   geom_point(size=5)  +
@@ -106,12 +101,12 @@ ggsave(paste0(output.prefix, ".burden_vs_growth_rates.pdf"))
 p <- ggplotly(p)
 htmlwidgets::saveWidget(as_widget(p), paste0(output.prefix, ".burden_vs_growth_rates.html"))
 
-#We need to convert NA replicates to a factor number.
-#all.data$replicate=factor(all.data$replicate, levels=c(1,levels(all.data$replicate)))
-#all.data$replicate[is.na(all.data$replicate)] = 1
+#We need to convert NA isolates to a factor number.
+#all.data$isolate=factor(all.data$isolate, levels=c(1,levels(all.data$isolate)))
+#all.data$isolate[is.na(all.data$isolate)] = 1
 
-all.data$replicate=as.factor(all.data$replicate)
-p = ggplot(all.data, aes_(x=as.name("strain"), y=as.name(paste0(readings[1], ".rate")), fill=as.name("replicate")))  +  geom_bar(size=3, stat="identity", position=position_dodge()) +
+all.data$isolate=as.factor(all.data$isolate)
+p = ggplot(all.data, aes_(x=as.name("strain"), y=as.name(paste0(readings[1], ".rate")), fill=as.name("isolate")))  +  geom_bar(size=3, stat="identity", position=position_dodge()) +
   geom_errorbar(aes(ymin=growth.rate-growth.rate.sd, ymax=growth.rate+growth.rate.sd), position=position_dodge()) + 
   scale_y_continuous(limits = c(0, max(all.data$growth.rate+all.data$growth.rate.sd))) + 
 
