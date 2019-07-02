@@ -114,3 +114,4 @@ ggsave(paste0(output.prefix, ".growth_rates.pdf"))
 
 p <- ggplotly(p)
 htmlwidgets::saveWidget(as_widget(p), paste0(output.prefix, ".growth_rates.html"))
+
