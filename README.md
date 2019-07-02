@@ -18,29 +18,35 @@ This is a tab-separated-values text file (TSV) describing the layout of wells an
 
 Column Descriptions:
 * **well** - column (letter) and row (number) of the well on the microplate
-* **include** - whether to include this well in the analysis. 0/F/false = no, 1/T/true= yes
 * **strain** - the strain/construct that was placed in that well. You _cannot_ use a double underscore "__" in strain names!
-   * Use **blank** in the **strain** column for wells that contain only medium and no cells.
-* **isolate** - number or letter designating different versions of the same strain. For example, different colonies picked after a transformation that might have genetic differences in the plasmids/chromosomes. Different values here represent different _biological replicates_ for a given construct. You do not need to fill in this column for **blanks**.
+   * Use **blank** or *b* in the **strain** column for wells that contain only medium and no cells.
+* **include** - _optional_ column determining whether to include this well in the analysis. Set it to false to remove wells with technical problems. (0/F/false/blank = no, 1/T/true= yes)
+* **isolate** - _optional_ column with a number, letter, or name designating different versions of the same strain. For example, different colonies picked after a transformation that might have genetic differences in the plasmids/chromosomes could be labeled A, B, C,. Different values here represent different _biological replicates_ for a given construct. This value will be ignored for **blanks**.
  **description** - _optional_ column with additional information
 
 Example excerpt from a file showing different types of data and formats:
 ```text
-well  include strain  isolate  description
-B1  1  blank    just LB
-B2  1  blank    just LB
-B3  1  blank    just LB
-B4  1  BM1  1 burden monitor strain with empty plasmid, biol repl 1, tech repl 1
-B5  1  BM1  1 burden monitor strain with empty plasmid, biol repl 1, tech repl 2
-B6  1  BM1  1 burden monitor strain with empty plasmid, biol repl 1, tech repl 3
-B7  T  BM1  2 burden monitor with empty plasmid, biol repl 2, tech repl 1
-B8  True  BM1  3 burden monitor with empty plasmid, biol repl 2, tech repl 2
-B9  True  BM1  3 burden monitor with empty plasmid, biol repl 2, tech repl 3
-B10 0  blank  contaminated
-B11 0  blank  forgot to inoculate
-B12 0  blank  outlier
+well  strain  control include isolate description
+B1    blank   F       T               just LB
+B2    blank   F       T               just LB
+B3    blank   F       T               just LB
+B4    Test1   F       T       A       test strain 1, transformant A, tech repl 1
+B5    Test1   F       T       A       test strain 1, transformant A, tech repl 2
+B6    Test1   F       T       A       test strain 1, transformant A, tech repl 3
+B7    Test2   F       T       B       test strain 1, biol repl 2, tech repl 1
+B8    Test2   F       T       B       test strain 1, biol repl 2, tech repl 2
+B9    Test2   F       T       B       test strain 1, biol repl 2, tech repl 3
+B10   blank   F       F               contaminated
+B11   blank   F       F               forgot to inoculate
+B12   blank   F       F               outlier
+C1    Ctrl1   T       T               control strain 1, tech repl 1
+C2    Ctrl1   T       T               control strain 1, tech repl 2
+C3    Ctrl1   T       T               control strain 1, tech repl 3
+C4    Ctrl2   T       T               control strain 2, tech repl 1
+C5    Ctrl2   T       T               control strain 2, tech repl 2
+C6    Ctrl2   T       T               control strain 2, tech repl 3
 ```
-Each of the wells that has the same **strain** and **isolate** values defines a _technical replicate_.
+Each of the wells that has the same **strain** and **isolate** are considered together as _technical replicates_.
 
 ### Platereader file format
 
@@ -93,7 +99,7 @@ Try running this on the data found in `examples/igem001`.
 ## Summary Graphs
 
 This creates a summary graph of growth rate versus GFP production for each strain tested. It can accept multiple input file
-prefixes to enable comparing data between multiple `burden.R` runs.
+prefixes to enable comparing data between multiple `burden.R` runsuuu.
 
 ```bash
 summary-graph.R --input igem001

@@ -25,8 +25,9 @@
 #
 # 3) Set any of these variables ahead of time to override the defaults.
 #
-#    Example command
+#    Example commands:
 #      max.method = 1
+#      output.prefix = "my_output"
 #
 ##############################################################
 
@@ -69,33 +70,45 @@ if (!exists("input.prefix")) {
   }
   input.prefix = opt$input
   
-  if (is.null(opt$output)) {
-    output.prefix = input.prefix
-  } else {
+  if (!is.null(opt$output)) {
     output.prefix = opt$output
   }
   
+  if (!is.null(opt$max.method)) {
+    max.method = opt$max.method 
+  }
+  
 } else {
-  # test mode
-  input.prefix = input.prefix
+  # RStudio mode 
+  # You have manually assigned input.prefix to reach this block
+  # Nothing else is necessary...
 }
 
 
-if (!exists("output.prefix")) {
-  output.prefix = input.prefix
+# Set values of these variables to command-line values if provided.
+# "option.____" variable names are the ones that should be used throughout
+# the code below in case the settings are changed within RStudio
+# between runs of the code
+
+option.input.prefix = input.prefix
+
+# Default to the same output prefix as input prefix. 
+if (exists("output.prefix")) {
+  option.output.prefix = output.prefix
+} else {
+  option.output.prefix = input.prefix
 }
 
-if (!exists("max.method")) {
-  max.method = 2
+#Default to max.method 2 (for now)
+if (exists("max.method")) {
+  option.max.method = max.method
+} else {
+  option.max.method = 2
 }
 
-
-cat("Input prefix: ", input.prefix, "\n")
-cat("Output prefix: ", output.prefix, "\n")
-
-#Create the plot directory
-plot.directory = paste0(output.prefix, "-plots")
-dir.create(file.path(plot.directory), showWarnings = FALSE)
+##############################################################
+#### Advanced options that are currently hard-coded
+##############################################################
 
 #TODO: Add an option to have a third reading (e.g., of BFP or luminescence)
 readings = c("OD", "GFP") 
@@ -103,8 +116,6 @@ readings = c("OD", "GFP")
 # Fix all initial measurements to be equal across all non-blank samples in a category
 offset.readings.to.average = T
 offset.readings.to.average.time.span = c(0,60)
-
-### Advanced options below
 
 minimum.OD = 0.0
 maximum.time = 1000000
@@ -115,6 +126,25 @@ maximum.time = 250
 time.point.span = 3
 time.point.delta = floor(time.point.span/2)
 
+
+##############################################################
+#### Print the Options
+##############################################################
+
+cat("Input prefix: ", option.input.prefix, "\n")
+cat("Output prefix: ", option.output.prefix, "\n")
+cat("Maximum picking option: ", option.max.method, "\n")
+
+
+#TODO: Options should also be output as comments at the beginning of the 
+#      summary file for tracability
+
+##############################################################
+#### Create the plot directory
+##############################################################
+plot.directory = paste0(option.output.prefix, "-plots")
+dir.create(file.path(plot.directory), showWarnings = FALSE)
+
 ##############################################################
 #### Load measurement file and tidy
 ##############################################################
@@ -124,15 +154,16 @@ time.point.delta = floor(time.point.span/2)
 
 all_data = data.frame()
 
-if (file.exists(paste0(input.prefix, ".measurements.csv"))) {
-  all_data <- read_csv(paste0(input.prefix, ".measurements.csv"), col_names=F, comment = "#" )
-} else if (file.exists(paste0(input.prefix, ".measurements.tsv"))) {
-  all_data <- read_tsv(paste0(input.prefix, ".measurements.tsv"), col_names=F, comment = "#" )
+if (file.exists(paste0(option.input.prefix, ".measurements.csv"))) {
+  all_data <- read_csv(paste0(option.input.prefix, ".measurements.csv"), col_names=F, comment = "#" )
+} else if (file.exists(paste0(option.input.prefix, ".measurements.tsv"))) {
+  all_data <- read_tsv(paste0(option.input.prefix, ".measurements.tsv"), col_names=F, comment = "#" )
 } else {
-  stop(paste0("Could not find a valid measurements file. Tried:\n", paste0(input.prefix, ".measurements.csv"), "\n", paste0(input.prefix, ".measurements.tsv")))
+  stop(paste0("Could not find a valid measurements file. Tried:\n", paste0(option.input.prefix, ".measurements.csv"), "\n", paste0(option.input.prefix, ".measurements.tsv")))
 }
 
-
+# If there is no header row of wells, assume standard order by row from top of plate.
+# Otherwise, take the first row as the well labels.
 if (all_data$X1[1] == "0s") {
   names(all_data) = c("Time",
                       "A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9", "A10", "A11", "A12",
@@ -159,8 +190,9 @@ all_data$Time <- str_replace(all_data$Time, "s", "")
 all_data$Time <- as.integer(all_data$Time)
 all_data <- na.omit (all_data)
 
-#separate data into data frames to make tidy
-#where are the zero times? (they separate the different readings)
+#Separate data into data frames to make tidy
+
+#Find the zero times? (they separate the different types of readings)
 zeros <- which(all_data$Time == "0")
 zeros = c(zeros, nrow(all_data)+1)
 
@@ -168,7 +200,6 @@ zeros = c(zeros, nrow(all_data)+1)
 reading.names = c("OD", "GFP", "other")
 
 tidy_all = data.frame()
-
 
 ## Need to keep all times in lock step despite some rounding
 ## so we use the first chunk times
@@ -188,8 +219,12 @@ for(i in 1:(length(zeros)-1)) {
   tidy_all = tidy_all %>% bind_rows(tidy.data.chunk)
 }
 
+# Remove overflow readings
 tidy_all = tidy_all %>% filter(value != "Overflow") 
-write_tsv( tidy_all, paste0(output.prefix, ".tidy.tsv"))
+
+
+#Write the tidy data
+write_csv( tidy_all, paste0(option.output.prefix, ".tidy.measurements.csv"))
 
 ##############################################################
 #### Load metadata file and tidy
@@ -197,22 +232,56 @@ write_tsv( tidy_all, paste0(output.prefix, ".tidy.tsv"))
 
 metadata <- data.frame()
 
-if (file.exists(paste0(input.prefix, ".metadata.csv"))) {
-  metadata <- read_csv(paste0(input.prefix, ".metadata.csv"), col_names=T, comment = "#" )
-} else if (file.exists(paste0(input.prefix, ".metadata.tsv"))) {
-  metadata <- read_tsv(paste0(input.prefix, ".metadata.tsv"), col_names=T, comment = "#" )
+if (file.exists(paste0(option.input.prefix, ".metadata.csv"))) {
+  metadata <- read_csv(paste0(option.input.prefix, ".metadata.csv"), col_names=T, comment = "#" )
+} else if (file.exists(paste0(option.input.prefix, ".metadata.tsv"))) {
+  metadata <- read_tsv(paste0(option.input.prefix, ".metadata.tsv"), col_names=T, comment = "#" )
 } else {
-  stop(paste0("Could not find a valid measurements file. Tried:\n", paste0(input.prefix, ".measurements.csv"), "\n", paste0(input.prefix, ".measurements.tsv")))
+  stop(paste0("Could not find a valid measurements file. Tried:\n", paste0(option.input.prefix, ".measurements.csv"), "\n", paste0(option.input.prefix, ".measurements.tsv")))
 }
 
+## Check for required columns
+if(! ("well" %in% colnames(metadata)) ) {
+  stop("Metadata does not have 'well' column (case-sensitive)", call.=FALSE)
+}
+if(! ("strain" %in% colnames(metadata)) ) {
+  stop("Metadata does not have 'strain' column (case-sensitive)", call.=FALSE)
+}
 
-#convert booleans - ignore wells
-metadata$include = as.numeric(metadata$include)
-ignore.wells = metadata$well[metadata$include==0]
-metadata = metadata %>% filter(include==1)
+#Add optional columns if missing
+if(! ("include" %in% colnames(metadata)) ) {
+  metadata$include = T
+}
+if(! ("isolate" %in% colnames(metadata)) ) {
+  metadata$isolate = NA
+}
+if(! ("description" %in% colnames(metadata)) ) {
+  metadata$description = ""
+}
 
-metadata$strain = paste0(metadata$strain, "__", metadata$isolate)
-metadata$strain = sub("blank__NA", "blank", metadata$strain)
+#convert boolean fields
+metadata$include = as.logical(metadata$include)
+
+
+## Determine what wells we are ignoring and remove from metadata
+ignore.wells = metadata$well[metadata$include==F]
+metadata = metadata %>% filter(include==T)
+
+# Fix the names of strains that are synonyms for blank (case-insensitive)
+metadata$strain.upper = toupper(metadata$strain)
+metadata$strain[grepl("^(B|BLANK)$", metadata$strain.upper, perl=T)] = "blank"
+metadata = metadata %>% select(-strain.upper)
+
+# Blanks can't have isolate numbers
+metadata$isolate[metadata$strain=="blank"] = NA
+
+metadata$strain.isolate = paste0(metadata$strain, "__", metadata$isolate)
+
+#Fix wells that have blank back to blank
+metadata$strain.isolate = sub("blank__NA", "blank", metadata$strain.isolate)
+
+write_csv( metadata, paste0(option.output.prefix, ".tidy.metadata.csv"))
+
 
 ##############################################################
 #### Combine tidy measurement and metadata files
@@ -298,10 +367,10 @@ if (offset.readings.to.average) {
     
     ZZ = Z %>% filter((time.min >= offset.readings.to.average.time.span[1]) & (time.min <= offset.readings.to.average.time.span[2]))
     
-    strain.means = ZZ %>% group_by(strain) %>% summarize(mean.strain.OD = mean(OD), mean.strain.GFP = mean(GFP))
-    well.means = ZZ %>% group_by(well, strain) %>% summarize(mean.well.OD = mean(OD), mean.well.GFP = mean(GFP))
+    strain.means = ZZ %>% group_by(strain.isolate) %>% summarize(mean.strain.OD = mean(OD), mean.strain.GFP = mean(GFP))
+    well.means = ZZ %>% group_by(well, strain.isolate) %>% summarize(mean.well.OD = mean(OD), mean.well.GFP = mean(GFP))
   
-    well.means = well.means %>% left_join(strain.means, by="strain")
+    well.means = well.means %>% left_join(strain.means, by="strain.isolate")
     
     well.means$well.OD.offset = well.means$mean.strain.OD - well.means$mean.well.OD
     well.means$well.GFP.offset = well.means$mean.strain.GFP - well.means$mean.well.GFP
@@ -329,10 +398,10 @@ if (offset.readings.to.average) {
 
 Z = Z %>% filter (OD >= minimum.OD)
 final.table = data.frame()
-for (strain.of.interest in unique(Z$strain) )
+for (strain.of.interest in unique(Z$strain.isolate) )
 {
   cat("STRAIN:", strain.of.interest, "\n") 
-  strain.data = Z %>% filter(strain==strain.of.interest)
+  strain.data = Z %>% filter(strain.isolate==strain.of.interest)
   head(strain.data)
   
   ## graph
@@ -415,7 +484,7 @@ for (strain.of.interest in unique(Z$strain) )
   strain.max.values = data.frame()
   
   
-  cat("STRAIN:", strain.of.interest, "\n\n")
+  cat("STRAIN__ISOLATE:", strain.of.interest, "\n\n")
   
   for (this.well in levels(growth.rate.data$well)) {
     
@@ -430,7 +499,7 @@ for (strain.of.interest in unique(Z$strain) )
     
     cat("Max growth rate:", max.growth.rate.row$specific.growth.rate, "per hour\n")
     
-    if (max.method==1) {
+    if (option.max.method==1) {
       max.GFP.fluorescence.data.row = fluorescence.data %>% filter(well == this.well) %>% filter(time.min == max.growth.rate.row$time.min[1])
     } else {
       
@@ -447,7 +516,7 @@ for (strain.of.interest in unique(Z$strain) )
     
     if (length(readings) == 3) {
       
-      if (max.method==1) {
+      if (option.max.method==1) {
         max.other.fluorescence.data.row = fluorescence.data %>% filter(well == this.well) %>% filter(time.min == max.growth.rate.row$time.min[1]) 
       } else {
         
@@ -494,7 +563,7 @@ for (strain.of.interest in unique(Z$strain) )
     
     final.table = bind_rows(final.table, 
                             data.frame(
-                              strain = strain.of.interest,
+                              strain.isolate = strain.of.interest,
                               growth.rate = mean(strain.max.values$growth.rate),
                               growth.rate.sd = sd(strain.max.values$growth.rate),
                               GFP.rate = mean(max.GFP.fluorescence.data.row$GFP.rate),
@@ -506,7 +575,7 @@ for (strain.of.interest in unique(Z$strain) )
     
     final.table = bind_rows(final.table, 
                             data.frame(
-                              strain = strain.of.interest,
+                              strain.isolate = strain.of.interest,
                               growth.rate = mean(strain.max.values$growth.rate),
                               growth.rate.sd = sd(strain.max.values$growth.rate),
                               GFP.rate = mean(max.GFP.fluorescence.data.row$GFP.rate),
@@ -522,10 +591,11 @@ for (strain.of.interest in unique(Z$strain) )
 
 
 ##Split out strain and replicate
-final.table$replicate = sub("^.+__", "", final.table$strain, perl = T)
-final.table$strain = sub("__.+$", "", final.table$strain, perl = T)
+final.table$isolate= sub("^.+__", "", final.table$strain.isolate, perl = T)
+final.table$strain = sub("__.+$", "", final.table$strain.isolate, perl = T)
+final.table = final.table %>% select(-strain.isolate)
 
-write_csv(final.table, paste0(output.prefix, ".rates.summary.csv"))
+write_csv(final.table, paste0(option.output.prefix, ".rates.summary.csv"))
 
 # Need to fix output of fit in each well
 #write_tsv(strain.max.values, paste0(dataset.name, ".rates.perwell.csv"))
