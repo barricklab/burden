@@ -20,14 +20,12 @@
 #
 ##############################################################
 
-require(dplyr)
-require(plotly)
-require(ggplot2)
-require(tidyr)
-require(gridExtra)
-require(cowplot)
-require(readr)
-require(optparse)
+library(tidyverse)
+library(plotly)
+library(gridExtra)
+library(cowplot)
+library(optparse)
+library(xtable)
 
 if (!exists("input.file.string")) {
   
