@@ -22,7 +22,6 @@
 
 library(tidyverse)
 library(plotly)
-library(ggplot2)
 library(gridExtra)
 library(cowplot)
 library(optparse)
