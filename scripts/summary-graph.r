@@ -102,8 +102,8 @@ p <- ggplotly(p)
 htmlwidgets::saveWidget(as_widget(p), paste0(output.prefix, ".burden_vs_growth_rates.html"))
 
 #We need to convert NA isolates to a factor number.
-#all.data$isolate=factor(all.data$isolate, levels=c(1,levels(all.data$isolate)))
-#all.data$isolate[is.na(all.data$isolate)] = 1
+all.data$isolate=factor(all.data$isolate, levels=c(1,levels(all.data$isolate)))
+all.data$isolate[is.na(all.data$isolate)] = 1
 
 all.data$isolate=as.factor(all.data$isolate)
 p = ggplot(all.data, aes_(x=as.name("strain"), y=as.name(paste0(readings[1], ".rate")), fill=as.name("isolate")))  +  geom_bar(size=3, stat="identity", position=position_dodge()) +
