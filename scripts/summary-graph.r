@@ -94,7 +94,8 @@ p = ggplot(all.data, aes_(x=as.name(paste0(readings[1], ".rate")), y=as.name(pas
   geom_point(size=5)  +
   scale_x_continuous(limits = c(0, max(all.data$growth.rate+all.data$growth.rate.sd))) + 
   scale_y_continuous(limits = c(0, max(all.data$GFP.rate+all.data$GFP.rate.sd))) + 
-  geom_abline(intercept=0, slope = slope_fixed_zero)
+  geom_abline(intercept=0, slope = slope_fixed_zero) +
+  NULL
 
 ggsave(paste0(output.prefix, ".burden_vs_growth_rates.pdf"))
 
@@ -106,9 +107,11 @@ all.data$isolate=factor(all.data$isolate, levels=c(1,levels(all.data$isolate)))
 all.data$isolate[is.na(all.data$isolate)] = 1
 
 all.data$isolate=as.factor(all.data$isolate)
-p = ggplot(all.data, aes_(x=as.name("strain"), y=as.name(paste0(readings[1], ".rate")), fill=as.name("isolate")))  +  geom_bar(size=3, stat="identity", position=position_dodge()) +
-  geom_errorbar(aes(ymin=growth.rate-growth.rate.sd, ymax=growth.rate+growth.rate.sd), position=position_dodge()) + 
-  scale_y_continuous(limits = c(0, max(all.data$growth.rate+all.data$growth.rate.sd))) + 
+p = ggplot(all.data, aes_(x=as.name("strain"), y=as.name(paste0(readings[1], ".rate")), fill=as.name("isolate")))  +  
+	geom_bar(size=3, stat="identity", position=position_dodge()) +
+	geom_errorbar(aes(ymin=growth.rate-growth.rate.sd, ymax=growth.rate+growth.rate.sd), position=position_dodge()) + 
+	scale_y_continuous(limits = c(0, max(all.data$growth.rate+all.data$growth.rate.sd))) +
+	NULL	
 
 ggsave(paste0(output.prefix, ".growth_rates.pdf"))
 
