@@ -27,6 +27,7 @@ library(cowplot)
 library(optparse)
 library(xtable)
 
+# display instructions at the command line to use this script 
 if (!exists("input.file.string")) {
   
   option_list = list(
@@ -50,14 +51,18 @@ if (!exists("input.file.string")) {
   input.file.string = opt$input
 }
 
-## Allow loading of multiple different results
+# Allow loading of multiple different results
+
 input.file.names = strsplit(input.file.string,",")
 
 readings = c("growth", "GFP") 
 
 all.data = data.frame()
 for (this.file.name in input.file.names[[1]]) {
-  
+# this loop iterates over each input file name and reads them into
+# data frame this.data, then combines them into one data frame all.data
+
+# allow multiple input file types (comma or tab separated files)  
   if (tools::file_ext(this.file.name) == "csv") {
     this.data <- read_csv(this.file.name)
     output.prefix= sub(".csv", "", input.file.names[[1]][1])
@@ -75,10 +80,10 @@ for (this.file.name in input.file.names[[1]]) {
 }
 
 
-
+#convert isolate to factor, so its not treated as numeric and mess with plotting
 all.data$isolate=as.factor(all.data$isolate)
 
-## fit line and show entire range
+# fit line and show entire range
 
 fit.data = all.data
 if("fit" %in% colnames(fit.data)) {
@@ -88,30 +93,36 @@ if("fit" %in% colnames(fit.data)) {
 fit_fixed_zero = lm(GFP.rate~growth.rate + 0, fit.data)
 slope_fixed_zero = coef(fit_fixed_zero)
 
-p = ggplot(all.data, aes_(x=as.name(paste0(readings[1], ".rate")), y=as.name(paste0(readings[2], ".rate")), color=as.name("strain"), shape=as.name("isolate")))  +
+# plot showing all strains burden vs growth 
+burdenVsGrowthPlot = ggplot(all.data, aes_(x=as.name(paste0(readings[1], ".rate")), y=as.name(paste0(readings[2], ".rate")), color=as.name("strain"), shape=as.name("isolate")))  +
   geom_errorbarh(aes(xmin=growth.rate-growth.rate.sd, xmax=growth.rate+growth.rate.sd), height=0) +
   geom_errorbar(aes(ymin=GFP.rate-GFP.rate.sd, ymax=GFP.rate+GFP.rate.sd), width=0) + 
   geom_point(size=5)  +
   scale_x_continuous(limits = c(0, max(all.data$growth.rate+all.data$growth.rate.sd))) + 
   scale_y_continuous(limits = c(0, max(all.data$GFP.rate+all.data$GFP.rate.sd))) + 
-  geom_abline(intercept=0, slope = slope_fixed_zero)
+  geom_abline(intercept=0, slope = slope_fixed_zero) +
+  NULL
 
 ggsave(paste0(output.prefix, ".burden_vs_growth_rates.pdf"))
 
-p <- ggplotly(p)
-htmlwidgets::saveWidget(as_widget(p), paste0(output.prefix, ".burden_vs_growth_rates.html"))
+burdenVsGrowthPlotly <- ggplotly(burdenVsGrowthPlot)
+htmlwidgets::saveWidget(as_widget(burdenVsGrowthPlotly), paste0(output.prefix, ".burden_vs_growth_rates.html"))
 
-#We need to convert NA isolates to a factor number.
-#all.data$isolate=factor(all.data$isolate, levels=c(1,levels(all.data$isolate)))
-#all.data$isolate[is.na(all.data$isolate)] = 1
+# We need to convert NA isolates to a factor number.
+all.data$isolate=factor(all.data$isolate, levels=c(1,levels(all.data$isolate)))
+all.data$isolate[is.na(all.data$isolate)] = 1
 
 all.data$isolate=as.factor(all.data$isolate)
-p = ggplot(all.data, aes_(x=as.name("strain"), y=as.name(paste0(readings[1], ".rate")), fill=as.name("isolate")))  +  geom_bar(size=3, stat="identity", position=position_dodge()) +
-  geom_errorbar(aes(ymin=growth.rate-growth.rate.sd, ymax=growth.rate+growth.rate.sd), position=position_dodge()) + 
-  scale_y_continuous(limits = c(0, max(all.data$growth.rate+all.data$growth.rate.sd))) + 
+
+# Plot growth rate for every strain
+growthRatePlot = ggplot(all.data, aes_(x=as.name("strain"), y=as.name(paste0(readings[1], ".rate")), fill=as.name("isolate")))  +  
+	geom_bar(size=3, stat="identity", position=position_dodge()) +
+	geom_errorbar(aes(ymin=growth.rate-growth.rate.sd, ymax=growth.rate+growth.rate.sd), position=position_dodge()) + 
+	scale_y_continuous(limits = c(0, max(all.data$growth.rate+all.data$growth.rate.sd))) +
+	NULL	
 
 ggsave(paste0(output.prefix, ".growth_rates.pdf"))
 
-p <- ggplotly(p)
-htmlwidgets::saveWidget(as_widget(p), paste0(output.prefix, ".growth_rates.html"))
+growthRatePlotly <- ggplotly(growthRatePlot)
+htmlwidgets::saveWidget(as_widget(growthRatePlotly), paste0(output.prefix, ".growth_rates.html"))
 

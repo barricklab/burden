@@ -22,7 +22,7 @@ Column Descriptions:
    * Use **blank** or *b* in the **strain** column for wells that contain only medium and no cells.
 * **include** - _optional_ column determining whether to include this well in the analysis. Set it to false to remove wells with technical problems. (0/F/false/blank = no, 1/T/true= yes)
 * **isolate** - _optional_ column with a number, letter, or name designating different versions of the same strain. For example, different colonies picked after a transformation that might have genetic differences in the plasmids/chromosomes could be labeled A, B, C,. Different values here represent different _biological replicates_ for a given construct. This value will be ignored for **blanks**.
- **description** - _optional_ column with additional information
+* **description** - _optional_ column with additional information
 
 Example excerpt from a file showing different types of data and formats:
 ```text
