@@ -128,16 +128,101 @@ time.point.delta = floor(time.point.span/2)
 
 
 ##############################################################
-#### Print the Options
+#### Print the Settings
 ##############################################################
 
-cat("Input prefix: ", option.input.prefix, "\n")
-cat("Output prefix: ", option.output.prefix, "\n")
-cat("Maximum picking option: ", option.max.method, "\n")
+#Create a dataframe of settings so that we can write them out
+# For sdf (settings data frame), the columns are ["name", "value"]
 
+add_setting <- function(sdf, n, v) {
+  sdf = suppressWarnings(bind_rows(sdf, data.frame(name=as.character(n), value=as.character(v))))
+  return(sdf)
+}
 
-#TODO: Options should also be output as comments at the beginning of the 
-#      summary file for tracability
+print_settings_df <- function(sdf) {
+  for (i in 1:nrow(sdf)) {
+    cat(paste0(sdf$name[i], " = ", sdf$value[i],"\n"))
+  }
+}
+
+# If possible (script has not been moved), get the repository/version of the code
+# and output this as a setting so that we can know which version was used!
+#
+# @JEB: This code finds the path of the current script so that we can offset to the 
+# Git file containing the currently checked out version. This is a pretty complex
+# thing to do and I have not tested this across platforms. It may need more work
+# so that we can allow it to gracefully fail w/o erroring out of the script.
+
+this_file_path <- function() {
+  cmdArgs <- commandArgs(trailingOnly = FALSE)
+  needle <- "--file="
+  match <- grep(needle, cmdArgs)
+  if (length(match) > 0) {
+    # Rscript
+    #cat("Rscript\n")
+    return(normalizePath(sub(needle, "", cmdArgs[match])))
+  } else if (!is.null(sys.frames()[[1]]$ofile)) {
+    # 'source'd via R console
+    #cat("Sourced\n")
+    return(normalizePath(sys.frames()[[1]]$ofile))
+  } else {
+    # Rstudio
+    #cat("RStudio\n")
+    return(rstudioapi::getActiveDocumentContext()$path)
+  }
+}
+
+#Returns data frame with 'version' and 'repository' fields
+git_repo_version <- function() {
+  git.file.path = file.path(dirname(this_file_path()), "..", ".git", "FETCH_HEAD")
+  #cat(git.file.path, "\n")
+  if(file.exists(git.file.path)) {
+    mystring <- read_file(git.file.path)
+    mystring = str_remove_all(mystring, "[\r\n]")
+    mystringlist = strsplit(mystring, "\t\t")
+    grv = c()
+    grv$version = mystringlist[[1]][1]
+    grv$repository = mystringlist[[1]][2]
+    return(grv)
+  } else {
+    grv = c()
+    grv$version = "unknown"
+    grv$version = "unknown"
+    return(grv)
+  }
+}
+git.repo.version.info = git_repo_version()
+
+sdf = data.frame()
+sdf = add_setting(sdf, "Run At", Sys.time())
+sdf = add_setting(sdf, "Repository", git.repo.version.info$repository)
+sdf = add_setting(sdf, "Version", git.repo.version.info$version)
+sdf = add_setting(sdf, "Input Prefix", option.input.prefix)
+sdf = add_setting(sdf, "Output Prefix", option.output.prefix)
+
+# Translate the method to something meaningful
+option.max.method.string = "unknown"
+if (option.max.method == 1) {
+  option.max.method.string = "1 (Find time point with maximum growth rate. Report all rates at this time point.) [one time = max growth rate]"
+} else if (option.max.method == 2) {
+  option.max.method.string = "1 (Find time point with maximum rate and report that for each curve separately.) [multiple times = max of each curve]"  
+}
+sdf = add_setting(sdf, "Maximum Picking Method", option.max.method.string)
+
+sdf = add_setting(sdf, "Readings", paste(readings))
+sdf = add_setting(sdf, "Offset Readings to Average", offset.readings.to.average)
+sdf = add_setting(sdf, "Offset Readings to Average Time Span", 
+                  paste(offset.readings.to.average.time.span, collapse="-"))
+sdf = add_setting(sdf, "Minimum OD", minimum.OD)
+sdf = add_setting(sdf, "Maximum Time", maximum.time)
+sdf = add_setting(sdf, "Time Point Span", time.point.span)
+sdf = add_setting(sdf, "Time Point Delta", time.point.delta)
+
+cat("=== SETTINGS ==\n")
+print_settings_df(sdf)
+write.csv(sdf, paste0(option.output.prefix, ".settings.csv"), row.names=F)
+
+#TODO: Get the github revision from the .git directory and add this information!
 
 ##############################################################
 #### Create the plot directory
@@ -214,8 +299,18 @@ for(i in 1:(length(zeros)-1)) {
   if (i==1) {
     definitive_times = floor(tidy.data.chunk$Time/60)
   }
+  
+  ## If the file was truncated - readings stopped in the middle of a row by the user,
+  ## Then later chunks may have fewer values. In this case, we need to shorten the earlier
+  ## ones and the number of definitive times.
+  if (nrow(tidy.data.chunk) < nrow(tidy_all)) {
+    tidy_all = tidy_all[1:nrow(tidy.data.chunk),]
+    definitive_times = definitive_times[1:nrow(tidy.data.chunk)]
+  }
+  
   tidy.data.chunk$time.min = definitive_times
   tidy.data.chunk = tidy.data.chunk %>% select (-Time)
+  
   tidy_all = tidy_all %>% bind_rows(tidy.data.chunk)
 }
 
@@ -598,5 +693,5 @@ final.table = final.table %>% select(-strain.isolate)
 write_csv(final.table, paste0(option.output.prefix, ".rates.summary.csv"))
 
 # Need to fix output of fit in each well
-#write_tsv(strain.max.values, paste0(dataset.name, ".rates.perwell.csv"))
+#write_csv(strain.max.values, paste0(dataset.name, ".rates.all.csv"))
           
