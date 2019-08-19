@@ -31,9 +31,33 @@
 #
 ##############################################################
 
-library(tidyverse)
-library(gridExtra)
-library(cowplot)
+suppressMessages(library(tidyverse))
+suppressMessages(library(gridExtra))
+suppressMessages(library(cowplot))
+
+
+
+##############################################################
+#### Error Handler
+##############################################################
+# This function will pause executionin Rstudio by entering an
+# infinite loop so that you can see the actual fatal error
+
+fatal_error <- function(msg) {
+
+  message("======= FATAL ERROR=======")
+  if (interactive()) {
+    message(msg)
+    message("Click the STOP sign to end after this fatal error")
+    while(T) {}
+  } else {
+    message(msg)
+    options("show.error.messages" = F)
+    stop()
+  }
+  
+}
+
 
 ##############################################################
 #### Load command line options and set global parameters
@@ -44,20 +68,20 @@ library(cowplot)
 
 
 if (!exists("input.prefix")) {
-  require(optparse)
+  suppressMessages(library(optparse))
   option_list = list(
     make_option(c("-i", "--input"), type="character", default=NULL, 
                 help="Input file prefix. Expects to find the files <input>.metadata.tsv and <input>.measurement.tsv", metavar="input.csv"),
     make_option(c("-o", "--output"), type="character", default=NULL, 
                 help="Output file prefix. Output files of the form <output>.* will be created. If this option is not provided the input file prefix will be used.", metavar="output_prefix"),
     make_option(c("-m", "--max-method"), type="character", default=2, 
-                help="Maximum picking method. 1=pick max growth rate time and use other rates at this same time. 2=pick maximum value of each curve at whatever time it occurs (may be different for growth rate and for fluorescence)", metavar="output_prefix")
+                help="Maximum picking method. 1=pick max growth rate time and use other rates at this same time. 2=pick maximum value of each curve at whatever time it occurs (may be different for growth rate and for fluorescence)", metavar="1/2")
     
     #TODO: We need to make more options accessible at the command line
   )
   
   usage_string = paste(
-    "burden.R -i input -o output\n\n",
+    "burden.R -i input -o output",
     sep = ""
   ) 
   
@@ -176,7 +200,7 @@ this_file_path <- function() {
 git_repo_version <- function() {
   git.file.path = file.path(dirname(this_file_path()), "..", ".git", "FETCH_HEAD")
   #cat(git.file.path, "\n")
-  if(file.exists(git.file.path)) {
+  if(file.exists(git.file.path) && file.exists(git.file.path)) {
     mystring <- read_file(git.file.path)
     mystring = str_remove_all(mystring, "[\r\n]")
     mystringlist = strsplit(mystring, "\t\t")
@@ -187,7 +211,7 @@ git_repo_version <- function() {
   } else {
     grv = c()
     grv$version = "unknown"
-    grv$version = "unknown"
+    grv$repository = "unknown"
     return(grv)
   }
 }
@@ -220,18 +244,32 @@ sdf = add_setting(sdf, "Time Point Delta", time.point.delta)
 
 cat("=== SETTINGS ==\n")
 print_settings_df(sdf)
+
+##############################################################
+#### Check that measurement and metadata files exist
+##############################################################
+
+if (   !file.exists(paste0(option.input.prefix, ".measurements.csv")) 
+    && !file.exists(paste0(option.input.prefix, ".measurements.tsv")) ) {
+  fatal_error(paste0("Could not find a valid measurements file. Tried:\n", paste0(option.input.prefix, ".measurements.csv"), "\n", paste0(option.input.prefix, ".measurements.tsv")))
+}
+
+if (   !file.exists(paste0(option.input.prefix, ".metadata.csv")) 
+       && !file.exists(paste0(option.input.prefix, ".metadata.tsv")) ) {
+  fatal_error(paste0("Could not find a valid measurements file. Tried:\n", paste0(option.input.prefix, ".measurements.csv"), "\n", paste0(option.input.prefix, ".measurements.tsv")))
+}
+  
+##############################################################
+#### Input files existed, now create the plot directory and write  settings
+##############################################################
+
 write.csv(sdf, paste0(option.output.prefix, ".settings.csv"), row.names=F)
 
-#TODO: Get the github revision from the .git directory and add this information!
-
-##############################################################
-#### Create the plot directory
-##############################################################
 plot.directory = paste0(option.output.prefix, "-plots")
 dir.create(file.path(plot.directory), showWarnings = FALSE)
 
 ##############################################################
-#### Load measurement file and tidy
+#### Load and tidy measurement file
 ##############################################################
 
 #SPL Note: had to run "dos2unix" to clean up the file from our platereader before it could be read properly. Not sure how to fix this on the windows end.
@@ -239,12 +277,11 @@ dir.create(file.path(plot.directory), showWarnings = FALSE)
 
 all_data = data.frame()
 
+# We know one of these exists b/c we checked above!
 if (file.exists(paste0(option.input.prefix, ".measurements.csv"))) {
   all_data <- read_csv(paste0(option.input.prefix, ".measurements.csv"), col_names=F, comment = "#" )
 } else if (file.exists(paste0(option.input.prefix, ".measurements.tsv"))) {
   all_data <- read_tsv(paste0(option.input.prefix, ".measurements.tsv"), col_names=F, comment = "#" )
-} else {
-  stop(paste0("Could not find a valid measurements file. Tried:\n", paste0(option.input.prefix, ".measurements.csv"), "\n", paste0(option.input.prefix, ".measurements.tsv")))
 }
 
 # If there is no header row of wells, assume standard order by row from top of plate.
@@ -322,17 +359,16 @@ tidy_all = tidy_all %>% filter(value != "Overflow")
 write_csv( tidy_all, paste0(option.output.prefix, ".tidy.measurements.csv"))
 
 ##############################################################
-#### Load metadata file and tidy
+#### Load and tidy metadata file
 ##############################################################
 
 metadata <- data.frame()
 
+# We know one of these exists b/c we checked above!
 if (file.exists(paste0(option.input.prefix, ".metadata.csv"))) {
   metadata <- read_csv(paste0(option.input.prefix, ".metadata.csv"), col_names=T, comment = "#" )
 } else if (file.exists(paste0(option.input.prefix, ".metadata.tsv"))) {
   metadata <- read_tsv(paste0(option.input.prefix, ".metadata.tsv"), col_names=T, comment = "#" )
-} else {
-  stop(paste0("Could not find a valid measurements file. Tried:\n", paste0(option.input.prefix, ".measurements.csv"), "\n", paste0(option.input.prefix, ".measurements.tsv")))
 }
 
 ## Check for required columns
@@ -492,7 +528,8 @@ if (offset.readings.to.average) {
 
 
 Z = Z %>% filter (OD >= minimum.OD)
-final.table = data.frame()
+final.table.summary = data.frame()
+final.table.all.wells = data.frame()
 for (strain.of.interest in unique(Z$strain.isolate) )
 {
   cat("STRAIN:", strain.of.interest, "\n") 
@@ -596,10 +633,9 @@ for (strain.of.interest in unique(Z$strain.isolate) )
     
     if (option.max.method==1) {
       max.GFP.fluorescence.data.row = fluorescence.data %>% filter(well == this.well) %>% filter(time.min == max.growth.rate.row$time.min[1])
-    } else {
+    } else if (option.max.method==2) {
       
       replicate.fluorescence.data = fluorescence.data %>% filter(well == this.well)
-      
       max.GFP.fluorescence.data.row = replicate.fluorescence.data[which.max(replicate.fluorescence.data$GFP.rate),]
     }
     
@@ -613,10 +649,9 @@ for (strain.of.interest in unique(Z$strain.isolate) )
       
       if (option.max.method==1) {
         max.other.fluorescence.data.row = fluorescence.data %>% filter(well == this.well) %>% filter(time.min == max.growth.rate.row$time.min[1]) 
-      } else {
+      } else if (option.max.method==2) {
         
         max.other.fluorescence.data.row = replicate.fluorescence.data[which.max(replicate.fluorescence.data$other.rate),]
-        
         max.GFP.fluorescence.data.row = replicate.fluorescence.data[which.max(replicate.fluorescence.data$other.rate),]
       }
       
@@ -627,6 +662,7 @@ for (strain.of.interest in unique(Z$strain.isolate) )
       
     strain.max.values = bind_rows(strain.max.values, 
                                   data.frame(
+                                    well = this.well,
                                     growth.rate = max.growth.rate.row$specific.growth.rate,
                                     GFP.rate = max.GFP.fluorescence.data.row$GFP.rate
                                   )
@@ -636,6 +672,7 @@ for (strain.of.interest in unique(Z$strain.isolate) )
       
     strain.max.values = bind_rows(strain.max.values, 
                                   data.frame(
+                                    well = this.well,
                                     growth.rate = max.growth.rate.row$specific.growth.rate,
                                     GFP.rate = max.GFP.fluorescence.data.row$GFP.rate,
                                     other.rate = max.other.fluorescence.data.row$other.rate
@@ -656,42 +693,82 @@ for (strain.of.interest in unique(Z$strain.isolate) )
   
   if (length(readings) == 2) {
     
-    final.table = bind_rows(final.table, 
+    final.table.summary = bind_rows(final.table.summary, 
                             data.frame(
                               strain.isolate = strain.of.interest,
+                              replicates = nrow(strain.max.values),
+                              wells = paste(strain.max.values$well, collapse=","),
                               growth.rate = mean(strain.max.values$growth.rate),
                               growth.rate.sd = sd(strain.max.values$growth.rate),
-                              GFP.rate = mean(max.GFP.fluorescence.data.row$GFP.rate),
+                              GFP.rate = mean(strain.max.values$GFP.rate),
                               GFP.rate.sd = sd(strain.max.values$GFP.rate)
+                            )
+    )
+    
+    final.table.all.wells = bind_rows(final.table.all.wells, 
+                            data.frame(
+                              strain.isolate = rep(strain.of.interest, nrow(strain.max.values)),
+                              well = strain.max.values$well,
+                              growth.rate = strain.max.values$growth.rate,
+                              GFP.rate = strain.max.values$GFP.rate
                             )
     )
     
   } else  if (length(readings) == 3) {
     
-    final.table = bind_rows(final.table, 
+    final.table.summary = bind_rows(final.table, 
                             data.frame(
                               strain.isolate = strain.of.interest,
+                              replicates = nrow(strain.max.values),
+                              wells = paste(strain.max.values$well, collapse=","),
                               growth.rate = mean(strain.max.values$growth.rate),
                               growth.rate.sd = sd(strain.max.values$growth.rate),
-                              GFP.rate = mean(max.GFP.fluorescence.data.row$GFP.rate),
+                              GFP.rate = mean(strain.max.values$GFP.rate),
                               GFP.rate.sd = sd(strain.max.values$GFP.rate),
-                              other.rate = mean(max.other.fluorescence.data.row$other.rate),
+                              other.rate = mean(strain.max.values$other.rate),
                               other.rate.sd = sd(strain.max.values$other.rate)
                             )
+    )
+    
+    final.table.all.wells = bind_rows(final.table.all.wells, 
+                                      data.frame(
+                                        strain.isolate = rep(strain.of.interest, nrow(strain.max.values)),
+                                        well = strain.max.values$well,
+                                        growth.rate = strain.max.values$growth.rate,
+                                        GFP.rate = strain.max.values$GFP.rate,
+                                        other.rate = mean(strain.max.values$other.rate)
+                                      )
     )
   }
   
 
 }
 
+##Split out strain and replicates, fix column order, sort rows
 
-##Split out strain and replicate
-final.table$isolate= sub("^.+__", "", final.table$strain.isolate, perl = T)
-final.table$strain = sub("__.+$", "", final.table$strain.isolate, perl = T)
-final.table = final.table %>% select(-strain.isolate)
+#### Summmry table
+final.table.summary$isolate= sub("^.+__", "", final.table.summary$strain.isolate, perl = T)
+final.table.summary$strain = sub("__.+$", "", final.table.summary$strain.isolate, perl = T)
+final.table.summary = final.table.summary %>% select(-strain.isolate)
 
-write_csv(final.table, paste0(option.output.prefix, ".rates.summary.csv"))
+final.column.order = c("strain", "isolate", "replicates", "wells", "growth.rate", "growth.rate.sd", "GFP.rate", "GFP.rate.sd")
+if (length(readings) == 3) {
+  final.column.order = c(final.column.order, "other.rate", "other.rate.sd")
+}
+final.table.summary = final.table.summary %>% select(final.column.order) %>% arrange(strain, isolate)
 
-# Need to fix output of fit in each well
-#write_csv(strain.max.values, paste0(dataset.name, ".rates.all.csv"))
+#### All table
+final.table.all.wells$isolate= sub("^.+__", "", final.table.all.wells$strain.isolate, perl = T)
+final.table.all.wells$strain = sub("__.+$", "", final.table.all.wells$strain.isolate, perl = T)
+final.table.all.wells = final.table.all.wells %>% select(-strain.isolate)
+
+final.column.order = c("strain", "isolate", "well", "growth.rate", "GFP.rate")
+if (length(readings) == 3) {
+  final.column.order = c(final.column.order, "other.rate")
+}
+final.table.all.wells = final.table.all.wells %>% select(final.column.order) %>% arrange(strain, isolate, well)
+
+### Write both final tables
+write_csv(final.table.summary, paste0(option.output.prefix, ".rates.summary.csv"))
+write_csv(final.table.all.wells, paste0(option.output.prefix, ".rates.all.csv"))
           
