@@ -134,8 +134,9 @@ if (exists("max.method")) {
 #### Advanced options that are currently hard-coded
 ##############################################################
 
-#TODO: Add an option to have a third reading (e.g., of BFP or luminescence)
-readings = c("OD", "GFP") 
+
+#Gets set automatically
+num.readings = NA
 
 # Fix all initial measurements to be equal across all non-blank samples in a category
 offset.readings.to.average = T
@@ -198,22 +199,31 @@ this_file_path <- function() {
 
 #Returns data frame with 'version' and 'repository' fields
 git_repo_version <- function() {
-  git.file.path = file.path(dirname(this_file_path()), "..", ".git", "FETCH_HEAD")
-  #cat(git.file.path, "\n")
-  if(file.exists(git.file.path) && file.exists(git.file.path)) {
-    mystring <- read_file(git.file.path)
+  
+  grv = c()
+  git.fetch.head.path = file.path(dirname(this_file_path()), "..", ".git", "FETCH_HEAD")
+  if(file.exists(git.fetch.head.path)) {
+    mystring <- read_file(git.fetch.head.path)
     mystring = str_remove_all(mystring, "[\r\n]")
-    mystringlist = strsplit(mystring, "\t\t")
-    grv = c()
-    grv$version = mystringlist[[1]][1]
-    grv$repository = mystringlist[[1]][2]
-    return(grv)
+    mystringlist = strsplit(mystring, "\t")
+    grv$repository = mystringlist[[1]][3]
   } else {
-    grv = c()
-    grv$version = "unknown"
     grv$repository = "unknown"
-    return(grv)
   }
+  
+  git.log.head.path = file.path(dirname(this_file_path()), "..", ".git", "logs", "HEAD")
+  if(file.exists(git.log.head.path)) {
+    mystring <- read_file(git.log.head.path)
+    linelist = strsplit(mystring, "\n")
+    lastline = linelist[[1]][length(linelist[[1]])]
+    lastline = str_remove_all(lastline, "[\r\n]")
+    lastlinelist = strsplit(lastline, " ")
+    grv$version = lastlinelist[[1]][2]
+  } else {
+    grv$version = "unknown"
+  }
+  
+  return(grv)
 }
 git.repo.version.info = git_repo_version()
 
@@ -233,7 +243,6 @@ if (option.max.method == 1) {
 }
 sdf = add_setting(sdf, "Maximum Picking Method", option.max.method.string)
 
-sdf = add_setting(sdf, "Readings", paste(readings))
 sdf = add_setting(sdf, "Offset Readings to Average", offset.readings.to.average)
 sdf = add_setting(sdf, "Offset Readings to Average Time Span", 
                   paste(offset.readings.to.average.time.span, collapse="-"))
@@ -318,6 +327,9 @@ all_data <- na.omit (all_data)
 zeros <- which(all_data$Time == "0")
 zeros = c(zeros, nrow(all_data)+1)
 
+stopifnot(length(zeros) <= 4) 
+num.readings = length(zeros) - 1
+
 #generic names for the readings
 reading.names = c("OD", "GFP", "other")
 
@@ -328,11 +340,10 @@ tidy_all = data.frame()
 definitive_times = c()
 
 for(i in 1:(length(zeros)-1)) {
-  
   this.data.chunk = all_data[zeros[i]:(zeros[i+1]-1),]
   tidy.data.chunk <- gather(this.data.chunk, key = "well", value = "value", -Time)
   tidy.data.chunk$reading <- reading.names[i]
-
+  
   if (i==1) {
     definitive_times = floor(tidy.data.chunk$Time/60)
   }
@@ -340,9 +351,9 @@ for(i in 1:(length(zeros)-1)) {
   ## If the file was truncated - readings stopped in the middle of a row by the user,
   ## Then later chunks may have fewer values. In this case, we need to shorten the earlier
   ## ones and the number of definitive times.
-  if (nrow(tidy.data.chunk) < nrow(tidy_all)) {
-    tidy_all = tidy_all[1:nrow(tidy.data.chunk),]
+  if (nrow(tidy.data.chunk) < length(definitive_times)) {
     definitive_times = definitive_times[1:nrow(tidy.data.chunk)]
+    tidy_all = tidy_all[1:(length(definitive_times)*(i-1)),]
   }
   
   tidy.data.chunk$time.min = definitive_times
@@ -447,17 +458,17 @@ BG$well = droplevels(BG$well)
 plot1 = ggplot(BG, aes(time.min, OD, color=well)) + geom_point() 
 plot2 = ggplot(BG, aes(time.min, GFP, color=well)) + geom_point() 
 
-if (length(readings) == 2) {
+if (num.readings == 2) {
   p = grid.arrange(plot1, plot2, nrow=2)
-} else if (length(readings) == 3) {
-  plot3 = ggplot(BG, aes(time.min, BFP, color=well)) + geom_point() 
+} else if (num.readings == 3) {
+  plot3 = ggplot(BG, aes(time.min, other, color=well)) + geom_point() 
   p = grid.arrange(plot1, plot2, plot3, nrow=3)
 }
 
 ggsave(file.path(plot.directory, "background.pdf"), plot=p)
 
 Z = Y
-if (length(readings) == 3) {
+if (num.readings== 3) {
   
   BG.means = BG %>% group_by(time.min) %>% summarize(other.bg = mean(other), GFP.bg = mean(GFP), OD.bg = mean(OD))
   
@@ -467,7 +478,7 @@ if (length(readings) == 3) {
   Z$GFP = Z$GFP - Z$GFP.bg
   Z$other = Z$other - Z$other.bg
   
-} else if (length(readings) == 2) {
+} else if (num.readings == 2) {
   
   BG.means = BG %>% group_by(time.min) %>% summarize(GFP.bg = mean(GFP), OD.bg = mean(OD))
   
@@ -494,7 +505,7 @@ if (offset.readings.to.average) {
   cat("Offsetting to average measured values\n")
   
   #calculate the average over all times for a sample
-  if (length(readings) == 2) {
+  if (num.readings == 2) {
     
     ZZ = Z %>% filter((time.min >= offset.readings.to.average.time.span[1]) & (time.min <= offset.readings.to.average.time.span[2]))
     
@@ -514,10 +525,27 @@ if (offset.readings.to.average) {
     Z$GFP = Z$GFP + Z$well.GFP.offset
     
     
-  } else if (length(readings) == 3) {
+  } else if (num.readings == 3) {
     
-    #stop("Not implemented")
-    #Z %>% group_by(strain, reading) %>% summarize(mean.sample.OD = mean(OD), mean.sample.GFP = mean(GFP), mean.sample.other = mean(other))
+    ZZ = Z %>% filter((time.min >= offset.readings.to.average.time.span[1]) & (time.min <= offset.readings.to.average.time.span[2]))
+    
+    strain.means = ZZ %>% group_by(strain.isolate) %>% summarize(mean.strain.OD = mean(OD), mean.strain.GFP = mean(GFP), mean.strain.other = mean(other))
+    well.means = ZZ %>% group_by(well, strain.isolate) %>% summarize(mean.well.OD = mean(OD), mean.well.GFP = mean(GFP), mean.well.other = mean(other))
+    
+    well.means = well.means %>% left_join(strain.means, by="strain.isolate")
+    
+    well.means$well.OD.offset = well.means$mean.strain.OD - well.means$mean.well.OD
+    well.means$well.GFP.offset = well.means$mean.strain.GFP - well.means$mean.well.GFP
+    well.means$well.other.offset = well.means$mean.strain.other - well.means$mean.well.other
+    
+    well.means = well.means %>% select(well, well.OD.offset, well.GFP.offset, well.other.offset)
+    
+    Z = Z %>% left_join(well.means, by="well")
+    
+    Z$OD = Z$OD + Z$well.OD.offset
+    Z$GFP = Z$GFP + Z$well.GFP.offset
+    Z$other = Z$other + Z$well.other.offset
+
   }
 }
 
@@ -541,9 +569,9 @@ for (strain.of.interest in unique(Z$strain.isolate) )
   plot1 = ggplot(strain.data, aes(time.min, OD, color=well)) + geom_point() 
   plot2 = ggplot(strain.data, aes(time.min, GFP, color=well)) + geom_point() 
   
-  if (length(readings) == 2) {
+  if (num.readings == 2) {
     p = grid.arrange(plot1, plot2, nrow=2)
-  } else if (length(readings) == 3) {
+  } else if (num.readings == 3) {
     plot3 = ggplot(strain.data, aes(time.min, other, color=well)) + geom_point() 
     p = grid.arrange(plot1, plot2, plot3, nrow=3)
   }
@@ -580,7 +608,7 @@ for (strain.of.interest in unique(Z$strain.isolate) )
     mutate( GFP.t1 = lag(GFP, time.point.delta, order_by=well)) %>% 
     mutate( GFP.t2 = lead(GFP, time.point.delta, order_by=well)) 
   
-  if (length(readings) == 3) {
+  if (num.readings == 3) {
     fluorescence.data = fluorescence.data %>% 
       mutate( other.t1 = lag(other, time.point.delta, order_by=well)) %>% 
       mutate( other.t2 = lead(other, time.point.delta, order_by=well))
@@ -590,15 +618,15 @@ for (strain.of.interest in unique(Z$strain.isolate) )
   fluorescence.data = fluorescence.data %>% mutate(time.min = (t1+t2)/2)
   fluorescence.data = fluorescence.data %>% mutate(GFP.rate = (GFP.t2 - GFP.t1) / (t2 - t1) / OD)
   
-  if (length(readings) == 3) {
+  if (num.readings == 3) {
     fluorescence.data = fluorescence.data %>% mutate(other.rate = (other.t2 - other.t1) / (t2 - t1) / OD)
     
   }
   
   plot2 = ggplot(fluorescence.data , aes(time.min, GFP.rate, color=well)) +  geom_point() 
-  if (length(readings) == 2) {
+  if (num.readings == 2) {
     p = grid.arrange(plot1, plot2, nrow=2)
-  } else if (length(readings) == 3) {
+  } else if (num.readings == 3) {
     fluorescence.data = fluorescence.data %>% mutate(other.rate = (other.t2 - other.t1) / (t2 - t1) / OD)
     plot3 = ggplot(fluorescence.data , aes(time.min, other.rate, color=well)) +  geom_point() 
     p = grid.arrange(plot1, plot2, plot3, nrow=3)
@@ -609,7 +637,7 @@ for (strain.of.interest in unique(Z$strain.isolate) )
   
   #ggplot(fluorescence.data , aes(time.min, GFP.rate, color=well)) + scale_x_continuous(limits = c(0, 400)) +  geom_point() 
   
-  #ggplot(fluorescence.data , aes(time.min, BFP.rate, color=well)) + scale_x_continuous(limits = c(0, 400)) +  geom_point() 
+  #ggplot(fluorescence.data , aes(time.min, other.rate, color=well)) + scale_x_continuous(limits = c(0, 400)) +  geom_point() 
 
   growth.rate.data$well = droplevels(growth.rate.data$well)
   
@@ -645,20 +673,19 @@ for (strain.of.interest in unique(Z$strain.isolate) )
     
 
     
-    if (length(readings) == 3) {
+    if (num.readings == 3) {
       
       if (option.max.method==1) {
         max.other.fluorescence.data.row = fluorescence.data %>% filter(well == this.well) %>% filter(time.min == max.growth.rate.row$time.min[1]) 
       } else if (option.max.method==2) {
         
         max.other.fluorescence.data.row = replicate.fluorescence.data[which.max(replicate.fluorescence.data$other.rate),]
-        max.GFP.fluorescence.data.row = replicate.fluorescence.data[which.max(replicate.fluorescence.data$other.rate),]
       }
       
-      cat("Max BPF production:", max.other.fluorescence.data.row$other.rate, "per hour\n")
+      cat("Max other production:", max.other.fluorescence.data.row$other.rate, "per hour\n")
     }
     
-  if (length(readings) == 2) {
+  if (num.readings == 2) {
       
     strain.max.values = bind_rows(strain.max.values, 
                                   data.frame(
@@ -668,7 +695,7 @@ for (strain.of.interest in unique(Z$strain.isolate) )
                                   )
     )
     
-   } else  if (length(readings) == 3) {
+   } else  if (num.readings == 3) {
       
     strain.max.values = bind_rows(strain.max.values, 
                                   data.frame(
@@ -684,14 +711,14 @@ for (strain.of.interest in unique(Z$strain.isolate) )
   cat("\n\n")
   cat("Growth rate:", mean(strain.max.values$growth.rate), "±", sd(strain.max.values$growth.rate), "\n")
   cat("GFP rate:", mean(strain.max.values$GFP.rate), "±", sd(strain.max.values$GFP.rate), "\n")
-  
-  if (length(readings) == 3) {
-    cat("other rate:", mean(strain.max.values$other.rate), "±", sd(strain.max.values$other.rate), "\n")
+
+  if (num.readings == 3) {
+    cat("Other rate:", mean(strain.max.values$other.rate), "±", sd(strain.max.values$other.rate), "\n")
   }
   cat("\n\n")
   
   
-  if (length(readings) == 2) {
+  if (num.readings == 2) {
     
     final.table.summary = bind_rows(final.table.summary, 
                             data.frame(
@@ -714,9 +741,9 @@ for (strain.of.interest in unique(Z$strain.isolate) )
                             )
     )
     
-  } else  if (length(readings) == 3) {
+  } else  if (num.readings == 3) {
     
-    final.table.summary = bind_rows(final.table, 
+    final.table.summary = bind_rows(final.table.summary, 
                             data.frame(
                               strain.isolate = strain.of.interest,
                               replicates = nrow(strain.max.values),
@@ -736,7 +763,7 @@ for (strain.of.interest in unique(Z$strain.isolate) )
                                         well = strain.max.values$well,
                                         growth.rate = strain.max.values$growth.rate,
                                         GFP.rate = strain.max.values$GFP.rate,
-                                        other.rate = mean(strain.max.values$other.rate)
+                                        other.rate = strain.max.values$other.rate
                                       )
     )
   }
@@ -752,7 +779,7 @@ final.table.summary$strain = sub("__.+$", "", final.table.summary$strain.isolate
 final.table.summary = final.table.summary %>% select(-strain.isolate)
 
 final.column.order = c("strain", "isolate", "replicates", "wells", "growth.rate", "growth.rate.sd", "GFP.rate", "GFP.rate.sd")
-if (length(readings) == 3) {
+if (num.readings == 3) {
   final.column.order = c(final.column.order, "other.rate", "other.rate.sd")
 }
 final.table.summary = final.table.summary %>% select(final.column.order) %>% arrange(strain, isolate)
@@ -763,7 +790,7 @@ final.table.all.wells$strain = sub("__.+$", "", final.table.all.wells$strain.iso
 final.table.all.wells = final.table.all.wells %>% select(-strain.isolate)
 
 final.column.order = c("strain", "isolate", "well", "growth.rate", "GFP.rate")
-if (length(readings) == 3) {
+if (num.readings== 3) {
   final.column.order = c(final.column.order, "other.rate")
 }
 final.table.all.wells = final.table.all.wells %>% select(final.column.order) %>% arrange(strain, isolate, well)
