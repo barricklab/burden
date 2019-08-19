@@ -14,7 +14,7 @@ The burden analysis requires two input files:
 
 ### Metadata file format
 
-This is a tab-separated-values text file (TSV) describing the layout of wells and sample that you must create in a text editor or Excel for each plate that you want to analyze.
+This is a comma-separated values (CSV) or tab-separated values text file (TSV) describing the layout of wells and sample that you must create in a text editor or Excel for each plate that you want to analyze.
 
 Column Descriptions:
 * **well** - column (letter) and row (number) of the well on the microplate
@@ -84,7 +84,7 @@ Format:
 It is expected that there are 2 or 3 types of measurements recorded in the file in blocks of rows in this order:
 * **OD600 absorbance values**
 * **GFP fluorescence values**
-* **user defined values (like BFP or RFP)** _Not fully implemented_
+* **user defined values (like BFP or RFP)**
 
 ### Platereader file format
 
