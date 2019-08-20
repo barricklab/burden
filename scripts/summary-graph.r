@@ -81,6 +81,9 @@ for (this.file.name in input.file.names[[1]]) {
 
 
 #convert isolate to factor, so its not treated as numeric and mess with plotting
+if (!("isolate" %in% colnames(all.data))) {
+  all.data$isolate=rep("1", nrow(all.data))
+}
 all.data$isolate=as.factor(all.data$isolate)
 
 # fit line and show entire range
