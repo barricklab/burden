@@ -20,12 +20,12 @@
 #
 ##############################################################
 
-library(tidyverse)
-library(plotly)
-library(gridExtra)
-library(cowplot)
-library(optparse)
-library(xtable)
+suppressMessages(library(tidyverse))
+suppressMessages(library(plotly))
+suppressMessages(library(gridExtra))
+suppressMessages(library(cowplot))
+suppressMessages(library(optparse))
+suppressMessages(library(xtable))
 
 # display instructions at the command line to use this script 
 if (!exists("input.file.string")) {
@@ -109,8 +109,8 @@ burdenVsGrowthPlotly <- ggplotly(burdenVsGrowthPlot)
 htmlwidgets::saveWidget(as_widget(burdenVsGrowthPlotly), paste0(output.prefix, ".burden_vs_growth_rates.html"))
 
 # We need to convert NA isolates to a factor number.
-all.data$isolate=factor(all.data$isolate, levels=c(1,levels(all.data$isolate)))
-all.data$isolate[is.na(all.data$isolate)] = 1
+all.data$isolate=factor(all.data$isolate)
+all.data$isolate[is.na(all.data$isolate)] = levels(all.data$isolate)[1]
 
 all.data$isolate=as.factor(all.data$isolate)
 
