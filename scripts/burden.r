@@ -488,6 +488,14 @@ if (num.readings== 3) {
   Z$GFP = Z$GFP - Z$GFP.bg
 
 }
+
+## There is an error in group_by with some versions of the tidyverse and it does
+## not average per time point and only gives an overall average
+
+if (nrow(BG.means)==1) {
+  fatal_error("Averaging the background per time point faied. Please update your tidyverse packages.\n   install.packages(\"tidyverse\")")
+}
+
 #Ditch the blanks here
 Z = Z %>% filter(strain != "blank")
 
