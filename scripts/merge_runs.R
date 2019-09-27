@@ -1,10 +1,6 @@
-# Merge together many *.rates.all.csv files
-# They must all be in the directory _rates.all.csv_ inside the working directory
-
-
 ##############  Read in the input files
 
-input.path = "_rates.all.csv_"
+#input.path = "_rates.all.csv_"
 input.rates.file.names  = list.files(path = input.path)
 
 readings = c("growth", "GFP") 
@@ -26,6 +22,10 @@ for (this.file.name in input.rates.file.names) {
     this.data$other.rate=c(NA)
   }
   
+  if(!("max.other.rate.time" %in% colnames(this.data))) {
+    this.data$max.other.rate.time=c(NA)
+  }
+  
   this.data$run=this.file.name
   this.data$run = sub(".rates.all.csv", "", this.data$run)
   #this.data$run = sub("exp", "", this.data$run)
@@ -36,4 +36,5 @@ for (this.file.name in input.rates.file.names) {
 
 ############## Write out the merged file
 
-write.csv(all.data, "rates.all.merged.csv")
+write.csv(all.data, "rates.all.merged.csv", row.names=F)
+

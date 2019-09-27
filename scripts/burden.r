@@ -66,6 +66,7 @@ fatal_error <- function(msg) {
 
 ## Defaults:
 
+default.minimum.OD = 0.0
 
 if (!exists("input.prefix")) {
   suppressMessages(library(optparse))
@@ -74,8 +75,12 @@ if (!exists("input.prefix")) {
                 help="Input file prefix. Expects to find the files <input>.metadata.tsv and <input>.measurement.tsv", metavar="input.csv"),
     make_option(c("-o", "--output"), type="character", default=NULL, 
                 help="Output file prefix. Output files of the form <output>.* will be created. If this option is not provided the input file prefix will be used.", metavar="output_prefix"),
+    make_option(c("-d", "--min-OD"), type="numeric", default=default.minimum.OD, 
+                help="Only use points with at least this minimum OD measurement", metavar="value"),
     make_option(c("-m", "--max-method"), type="character", default=2, 
-                help="Maximum picking method. 1=pick max growth rate time and use other rates at this same time. 2=pick maximum value of each curve at whatever time it occurs (may be different for growth rate and for fluorescence)", metavar="1/2")
+                help="Maximum picking method. 1=pick max growth rate time and use other rates at this same time. 2=pick maximum value of each curve at whatever time it occurs (may be different for growth rate and for fluorescence)", metavar="1/2"),
+    make_option(c("-p", "--no-plots"), type="bool", action="store_true", 
+                help="Don't create plots for quicker execution.")
     
     #TODO: We need to make more options accessible at the command line
   )
@@ -98,9 +103,13 @@ if (!exists("input.prefix")) {
     output.prefix = opt$output
   }
   
-  if (!is.null(opt$max.method)) {
-    max.method = opt$max.method 
+  if (!is.null(opt$'max-method')) {
+    max.method = opt$'max-method' 
   }
+  
+  no.plots = opt$'no-plots'
+  
+  minimum.OD = opt$'min-OD'
   
 } else {
   # RStudio mode 
@@ -130,6 +139,19 @@ if (exists("max.method")) {
   option.max.method = 2
 }
 
+if (exists("no.plots")) {
+  option.no.plots = no.plots
+} else {
+  option.no.plots = F
+}
+
+if (exists("minimum.OD")) {
+  option.minimum.OD = minimum.OD 
+} else {
+  option.minimum.OD = default.minimum.OD
+}
+
+
 ##############################################################
 #### Advanced options that are currently hard-coded
 ##############################################################
@@ -142,9 +164,8 @@ num.readings = NA
 offset.readings.to.average = T
 offset.readings.to.average.time.span = c(0,60)
 
-minimum.OD = 0.0
 maximum.time = 1000000
-maximum.time = 250
+maximum.time = 1000000
 
 # time.point.span should be an odd number 
 # time.point.delta is the number of points forward and back to use in the window for determining rates
@@ -246,10 +267,12 @@ sdf = add_setting(sdf, "Maximum Picking Method", option.max.method.string)
 sdf = add_setting(sdf, "Offset Readings to Average", offset.readings.to.average)
 sdf = add_setting(sdf, "Offset Readings to Average Time Span", 
                   paste(offset.readings.to.average.time.span, collapse="-"))
-sdf = add_setting(sdf, "Minimum OD", minimum.OD)
+sdf = add_setting(sdf, "Minimum OD", option.minimum.OD)
 sdf = add_setting(sdf, "Maximum Time", maximum.time)
 sdf = add_setting(sdf, "Time Point Span", time.point.span)
 sdf = add_setting(sdf, "Time Point Delta", time.point.delta)
+cat(option.no.plots, "\n")
+sdf = add_setting(sdf, "No plots", option.no.plots)
 
 cat("=== SETTINGS ==\n")
 print_settings_df(sdf)
@@ -274,8 +297,10 @@ if (   !file.exists(paste0(option.input.prefix, ".metadata.csv"))
 
 write.csv(sdf, paste0(option.output.prefix, ".settings.csv"), row.names=F)
 
-plot.directory = paste0(option.output.prefix, "-plots")
-dir.create(file.path(plot.directory), showWarnings = FALSE)
+if (!option.no.plots) {
+  plot.directory = paste0(option.output.prefix, "-plots")
+  dir.create(file.path(plot.directory), showWarnings = FALSE)
+}
 
 ##############################################################
 #### Load and tidy measurement file
@@ -319,7 +344,7 @@ if (all_data$X1[1] == "0s") {
 
 all_data$Time <- str_replace(all_data$Time, "s", "")
 all_data$Time <- as.integer(all_data$Time)
-all_data <- na.omit (all_data)
+all_data <- all_data %>% filter(!is.na(Time))
 
 #Separate data into data frames to make tidy
 
@@ -363,7 +388,7 @@ for(i in 1:(length(zeros)-1)) {
 }
 
 # Remove overflow readings
-tidy_all = tidy_all %>% filter(value != "Overflow") 
+tidy_all$value=as.numeric(tidy_all$value)
 
 
 #Write the tidy data
@@ -455,17 +480,20 @@ BG = Y %>% filter(strain=="blank")
 
 BG$well = droplevels(BG$well)
 
-plot1 = ggplot(BG, aes(time.min, OD, color=well)) + geom_point() 
-plot2 = ggplot(BG, aes(time.min, GFP, color=well)) + geom_point() 
-
-if (num.readings == 2) {
-  p = grid.arrange(plot1, plot2, nrow=2)
-} else if (num.readings == 3) {
-  plot3 = ggplot(BG, aes(time.min, other, color=well)) + geom_point() 
-  p = grid.arrange(plot1, plot2, plot3, nrow=3)
+if (!option.no.plots) {
+  plot1 = ggplot(BG, aes(time.min, OD, color=well)) + geom_point() 
+  plot2 = ggplot(BG, aes(time.min, GFP, color=well)) + geom_point() 
+  
+  
+  if (num.readings == 2) {
+    p = grid.arrange(plot1, plot2, nrow=2)
+  } else if (num.readings == 3) {
+    plot3 = ggplot(BG, aes(time.min, other, color=well)) + geom_point() 
+    p = grid.arrange(plot1, plot2, plot3, nrow=3)
+  }
+  
+  ggsave(file.path(plot.directory, "background.pdf"), plot=p)
 }
-
-ggsave(file.path(plot.directory, "background.pdf"), plot=p)
 
 Z = Y
 if (num.readings== 3) {
@@ -563,7 +591,7 @@ if (offset.readings.to.average) {
 ##############################################################
 
 
-Z = Z %>% filter (OD >= minimum.OD)
+Z = Z %>% filter (OD >= option.minimum.OD)
 final.table.summary = data.frame()
 final.table.all.wells = data.frame()
 for (strain.of.interest in unique(Z$strain.isolate) )
@@ -574,18 +602,19 @@ for (strain.of.interest in unique(Z$strain.isolate) )
   
   ## graph
   
-  plot1 = ggplot(strain.data, aes(time.min, OD, color=well)) + geom_point() 
-  plot2 = ggplot(strain.data, aes(time.min, GFP, color=well)) + geom_point() 
-  
-  if (num.readings == 2) {
-    p = grid.arrange(plot1, plot2, nrow=2)
-  } else if (num.readings == 3) {
-    plot3 = ggplot(strain.data, aes(time.min, other, color=well)) + geom_point() 
-    p = grid.arrange(plot1, plot2, plot3, nrow=3)
+  if (!option.no.plots) {
+    plot1 = ggplot(strain.data, aes(time.min, OD, color=well)) + geom_point() 
+    plot2 = ggplot(strain.data, aes(time.min, GFP, color=well)) + geom_point() 
+    
+    if (num.readings == 2) {
+      p = grid.arrange(plot1, plot2, nrow=2)
+    } else if (num.readings == 3) {
+      plot3 = ggplot(strain.data, aes(time.min, other, color=well)) + geom_point() 
+      p = grid.arrange(plot1, plot2, plot3, nrow=3)
+    }
+    
+    ggsave(file.path(plot.directory, paste0(strain.of.interest, ".pdf")), plot=p)
   }
-  
-  ggsave(file.path(plot.directory, paste0(strain.of.interest, ".pdf")), plot=p)
-  
   
   strain.data$logOD = log(strain.data$OD)
   #ggplot(strain.data, aes(time.min, logOD, color=well)) + scale_x_continuous(limits = c(0, 400))+ geom_point() 
@@ -605,8 +634,10 @@ for (strain.of.interest in unique(Z$strain.isolate) )
   growth.rate.data = growth.rate.data %>% mutate(time.min = (t1+t2)/2)
   growth.rate.data = growth.rate.data %>% mutate(specific.growth.rate = 60 * (logOD.t2 - logOD.t1) /  (t2 - t1))
   
-  plot1 = ggplot(growth.rate.data , aes(time.min, specific.growth.rate, color=well)) +  geom_point() 
-
+  if (!option.no.plots) {
+    plot1 = ggplot(growth.rate.data , aes(time.min, specific.growth.rate, color=well)) +  geom_point() 
+  }
+  
   fluorescence.data = strain.data
   
   fluorescence.data = fluorescence.data %>% 
@@ -631,17 +662,19 @@ for (strain.of.interest in unique(Z$strain.isolate) )
     
   }
   
-  plot2 = ggplot(fluorescence.data , aes(time.min, GFP.rate, color=well)) +  geom_point() 
-  if (num.readings == 2) {
-    p = grid.arrange(plot1, plot2, nrow=2)
-  } else if (num.readings == 3) {
-    fluorescence.data = fluorescence.data %>% mutate(other.rate = (other.t2 - other.t1) / (t2 - t1) / OD)
-    plot3 = ggplot(fluorescence.data , aes(time.min, other.rate, color=well)) +  geom_point() 
-    p = grid.arrange(plot1, plot2, plot3, nrow=3)
+  if (!option.no.plots) {
+    
+    plot2 = ggplot(fluorescence.data , aes(time.min, GFP.rate, color=well)) +  geom_point() 
+    if (num.readings == 2) {
+      p = grid.arrange(plot1, plot2, nrow=2)
+    } else if (num.readings == 3) {
+      fluorescence.data = fluorescence.data %>% mutate(other.rate = (other.t2 - other.t1) / (t2 - t1) / OD)
+      plot3 = ggplot(fluorescence.data , aes(time.min, other.rate, color=well)) +  geom_point() 
+      p = grid.arrange(plot1, plot2, plot3, nrow=3)
+    }
+    
+    ggsave(file.path(plot.directory, paste0(strain.of.interest, ".rates.pdf")), plot=p)
   }
-  
-  ggsave(file.path(plot.directory, paste0(strain.of.interest, ".rates.pdf")), plot=p)
-  
   
   #ggplot(fluorescence.data , aes(time.min, GFP.rate, color=well)) + scale_x_continuous(limits = c(0, 400)) +  geom_point() 
   
@@ -675,21 +708,31 @@ for (strain.of.interest in unique(Z$strain.isolate) )
       max.GFP.fluorescence.data.row = replicate.fluorescence.data[which.max(replicate.fluorescence.data$GFP.rate),]
     }
     
+    #Case for failing to find a max
+    if (nrow(max.GFP.fluorescence.data.row) == 0) {
+      max.GFP.fluorescence.data.row  = fluorescence.data[1,]
+      max.GFP.fluorescence.data.row$time.min[1] = NA
+      
+    }
+      
     cat("Time of GFP production rate:", max.GFP.fluorescence.data.row$time.min[1], "min\n")
-
     cat("Max GFP production rate:", max.GFP.fluorescence.data.row$GFP.rate, "per hour\n")
-    
-
     
     if (num.readings == 3) {
       
       if (option.max.method==1) {
         max.other.fluorescence.data.row = fluorescence.data %>% filter(well == this.well) %>% filter(time.min == max.growth.rate.row$time.min[1]) 
       } else if (option.max.method==2) {
-        
         max.other.fluorescence.data.row = replicate.fluorescence.data[which.max(replicate.fluorescence.data$other.rate),]
       }
       
+      #Case for failing to find a max
+      if (nrow(max.other.fluorescence.data.row) == 0) {
+        max.other.fluorescence.data.row  = fluorescence.data[1,]
+        max.other.fluorescence.data.row$time.min[1] = NA
+      }
+      
+      cat("Time of GFP production rate:", max.other.fluorescence.data.row$time.min[1], "min\n")
       cat("Max other production:", max.other.fluorescence.data.row$other.rate, "per hour\n")
     }
     
@@ -699,7 +742,9 @@ for (strain.of.interest in unique(Z$strain.isolate) )
                                   data.frame(
                                     well = this.well,
                                     growth.rate = max.growth.rate.row$specific.growth.rate,
-                                    GFP.rate = max.GFP.fluorescence.data.row$GFP.rate
+                                    GFP.rate = max.GFP.fluorescence.data.row$GFP.rate,
+                                    max.growth.rate.time = max.growth.rate.row$time.min[1],
+                                    max.GFP.rate.time = max.GFP.fluorescence.data.row$time.min[1]
                                   )
     )
     
@@ -710,7 +755,10 @@ for (strain.of.interest in unique(Z$strain.isolate) )
                                     well = this.well,
                                     growth.rate = max.growth.rate.row$specific.growth.rate,
                                     GFP.rate = max.GFP.fluorescence.data.row$GFP.rate,
-                                    other.rate = max.other.fluorescence.data.row$other.rate
+                                    other.rate = max.other.fluorescence.data.row$other.rate,
+                                    max.growth.rate.time = max.growth.rate.row$time.min[1],
+                                    max.GFP.rate.time = max.GFP.fluorescence.data.row$time.min[1],
+                                    max.other.rate.time = max.other.fluorescence.data.row$time.min[1]
                                   )
     )
     }
@@ -745,7 +793,9 @@ for (strain.of.interest in unique(Z$strain.isolate) )
                               strain.isolate = rep(strain.of.interest, nrow(strain.max.values)),
                               well = strain.max.values$well,
                               growth.rate = strain.max.values$growth.rate,
-                              GFP.rate = strain.max.values$GFP.rate
+                              GFP.rate = strain.max.values$GFP.rate,
+                              max.growth.rate.time = strain.max.values$max.growth.rate.time,
+                              max.GFP.rate.time = strain.max.values$max.GFP.rate.time
                             )
     )
     
@@ -771,7 +821,10 @@ for (strain.of.interest in unique(Z$strain.isolate) )
                                         well = strain.max.values$well,
                                         growth.rate = strain.max.values$growth.rate,
                                         GFP.rate = strain.max.values$GFP.rate,
-                                        other.rate = strain.max.values$other.rate
+                                        other.rate = strain.max.values$other.rate,                              
+                                        max.growth.rate.time = strain.max.values$max.growth.rate.time,
+                                        max.GFP.rate.time = strain.max.values$max.GFP.rate.time,
+                                        max.other.rate.time = strain.max.values$max.other.rate.time
                                       )
     )
   }
@@ -801,6 +854,12 @@ final.column.order = c("strain", "isolate", "well", "growth.rate", "GFP.rate")
 if (num.readings== 3) {
   final.column.order = c(final.column.order, "other.rate")
 }
+
+final.column.order = c(final.column.order, "max.growth.rate.time", "max.GFP.rate.time")
+if (num.readings== 3) {
+  final.column.order = c(final.column.order, "max.other.rate.time")
+}
+
 final.table.all.wells = final.table.all.wells %>% select(final.column.order) %>% arrange(strain, isolate, well)
 
 ### Write both final tables
