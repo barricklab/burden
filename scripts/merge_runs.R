@@ -1,9 +1,14 @@
 ##############  Read in the input files
+# How to use this script:
+#
+# Set the input.path variable to the path containing folders of runs
+#    input.path = "_rates_all_0.0_"
+#
+# Optionally, override the output.file.path assigned below
+output.file.path = "rates_all_0.0_merged.csv"
+# Then, run...
 
-#input.path = "_rates.all.csv_"
 input.rates.file.names  = list.files(path = input.path)
-
-readings = c("growth", "GFP") 
 
 all.data = data.frame()
 for (this.file.name in input.rates.file.names) {
@@ -17,24 +22,47 @@ for (this.file.name in input.rates.file.names) {
     this.data = this.data %>% filter(graph==1)
   }
   
-  #we have to add other.rate if it is missing to join all data together
-  if(!("other.rate" %in% colnames(this.data))) {
-    this.data$other.rate=c(NA)
-  }
+  ### Two modes for "all" and "summary" rates files
   
-  if(!("max.other.rate.time" %in% colnames(this.data))) {
-    this.data$max.other.rate.time=c(NA)
-  }
+  # We know we are using a summary if the "replicates" column exists:
   
-  this.data$run=this.file.name
-  this.data$run = sub(".rates.all.csv", "", this.data$run)
-  #this.data$run = sub("exp", "", this.data$run)
-  #this.data$run = as.numeric(this.data$run)
+  if ("replicates" %in% colnames(this.data)) {
     
+    #we have to add other.rate if it is missing to join all data together
+    if(!("other.rate" %in% colnames(this.data))) {
+      this.data$other.rate=c(NA)
+    }
+    
+    if(!("other.rate.sd" %in% colnames(this.data))) {
+      this.data$other.rate.sd=c(NA)
+    }
+    
+  } else {
+    
+    #we have to add other.rate if it is missing to join all data together
+    if(!("other.rate" %in% colnames(this.data))) {
+      this.data$other.rate=c(NA)
+    }
+    
+    if(!("max.other.rate.time" %in% colnames(this.data))) {
+      this.data$max.other.rate.time=c(NA)
+    }
+  }
+  
+
+  
+  this.data$experiment=this.file.name
+  this.data$experiment = sub(".rates.all.csv", "", this.data$experiment)
+  this.data$experiment = sub(".rates.summary.csv", "", this.data$experiment)
+  #this.data$experiment = sub("exp", "", this.data$experiment)
+
+  #Let's move the run column to the leftmost!
+  this.data <- this.data[c("experiment", colnames(this.data)[1:(length(colnames(this.data))-1)])]
+  
   all.data = rbind(all.data, this.data)
 }
 
 ############## Write out the merged file
 
-write.csv(all.data, "rates.all.merged.csv", row.names=F)
+write.csv(all.data, output.file.path, row.names=F)
 

@@ -67,6 +67,7 @@ fatal_error <- function(msg) {
 ## Defaults:
 
 default.minimum.OD = 0.0
+default.maximum.time = 600
 
 if (!exists("input.prefix")) {
   suppressMessages(library(optparse))
@@ -77,6 +78,8 @@ if (!exists("input.prefix")) {
                 help="Output file prefix. Output files of the form <output>.* will be created. If this option is not provided the input file prefix will be used.", metavar="output_prefix"),
     make_option(c("-d", "--min-OD"), type="numeric", default=default.minimum.OD, 
                 help="Only use points with at least this minimum OD measurement", metavar="value"),
+    make_option(c("-x", "--max-time"), type="numeric", default=default.maximum.time, 
+                help="Only consider data from the beginning of growth up to this time", metavar="value"),
     make_option(c("-m", "--max-method"), type="character", default=2, 
                 help="Maximum picking method. 1=pick max growth rate time and use other rates at this same time. 2=pick maximum value of each curve at whatever time it occurs (may be different for growth rate and for fluorescence)", metavar="1/2"),
     make_option(c("-p", "--no-plots"), type="bool", action="store_true", 
@@ -107,9 +110,17 @@ if (!exists("input.prefix")) {
     max.method = opt$'max-method' 
   }
   
-  no.plots = opt$'no-plots'
+  if (!is.null(opt$'max-time')) {
+    maximum.time = opt$'max-time' 
+  }
   
-  minimum.OD = opt$'min-OD'
+  if (!is.null(opt$'no-plots')) {
+    no.plots = opt$'no-plots'
+  }
+  
+  if (!is.null(opt$'min-OD')) {
+    minimum.OD = opt$'min-OD'
+  }
   
 } else {
   # RStudio mode 
@@ -151,6 +162,12 @@ if (exists("minimum.OD")) {
   option.minimum.OD = default.minimum.OD
 }
 
+if (exists("maximum.time")) {
+  option.maximum.time = maximum.time
+} else {
+  option.maximum.time = default.maximum.time
+}
+
 
 ##############################################################
 #### Advanced options that are currently hard-coded
@@ -163,9 +180,6 @@ num.readings = NA
 # Fix all initial measurements to be equal across all non-blank samples in a category
 offset.readings.to.average = T
 offset.readings.to.average.time.span = c(0,60)
-
-maximum.time = 1000000
-maximum.time = 1000000
 
 # time.point.span should be an odd number 
 # time.point.delta is the number of points forward and back to use in the window for determining rates
@@ -268,10 +282,9 @@ sdf = add_setting(sdf, "Offset Readings to Average", offset.readings.to.average)
 sdf = add_setting(sdf, "Offset Readings to Average Time Span", 
                   paste(offset.readings.to.average.time.span, collapse="-"))
 sdf = add_setting(sdf, "Minimum OD", option.minimum.OD)
-sdf = add_setting(sdf, "Maximum Time", maximum.time)
+sdf = add_setting(sdf, "Maximum Time", option.maximum.time)
 sdf = add_setting(sdf, "Time Point Span", time.point.span)
 sdf = add_setting(sdf, "Time Point Delta", time.point.delta)
-cat(option.no.plots, "\n")
 sdf = add_setting(sdf, "No plots", option.no.plots)
 
 cat("=== SETTINGS ==\n")
@@ -456,7 +469,7 @@ write_csv( metadata, paste0(option.output.prefix, ".tidy.metadata.csv"))
 
 #Now,  load the data file and wrangle it
 X = tidy_all
-X = X%>% filter(time.min < maximum.time)
+X = X%>% filter(time.min < option.maximum.time)
 X = X %>% filter(!(well %in% ignore.wells))
 X$value=as.numeric(X$value)
 Y = X %>% spread(reading, value)
