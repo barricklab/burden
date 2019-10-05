@@ -379,20 +379,21 @@ definitive_times = c()
 
 for(i in 1:(length(zeros)-1)) {
   this.data.chunk = all_data[zeros[i]:(zeros[i+1]-1),]
-  tidy.data.chunk <- gather(this.data.chunk, key = "well", value = "value", -Time)
-  tidy.data.chunk$reading <- reading.names[i]
   
   if (i==1) {
-    definitive_times = floor(tidy.data.chunk$Time/60)
+    definitive_times = floor(this.data.chunk$Time/60)
   }
   
   ## If the file was truncated - readings stopped in the middle of a row by the user,
   ## Then later chunks may have fewer values. In this case, we need to shorten the earlier
   ## ones and the number of definitive times.
-  if (nrow(tidy.data.chunk) < length(definitive_times)) {
-    definitive_times = definitive_times[1:nrow(tidy.data.chunk)]
-    tidy_all = tidy_all[1:(length(definitive_times)*(i-1)),]
+  if (nrow(this.data.chunk) < length(definitive_times)) {
+    definitive_times = definitive_times[1:nrow(this.data.chunk)]
+    tidy_all = tidy_all %>% filter(time.min < definitive_times[length(definitive_times)])
   }
+  
+  tidy.data.chunk <- gather(this.data.chunk, key = "well", value = "value", -Time)
+  tidy.data.chunk$reading <- reading.names[i]
   
   tidy.data.chunk$time.min = definitive_times
   tidy.data.chunk = tidy.data.chunk %>% select (-Time)
@@ -469,7 +470,7 @@ write_csv( metadata, paste0(option.output.prefix, ".tidy.metadata.csv"))
 
 #Now,  load the data file and wrangle it
 X = tidy_all
-X = X%>% filter(time.min < option.maximum.time)
+X = X %>% filter(time.min < option.maximum.time)
 X = X %>% filter(!(well %in% ignore.wells))
 X$value=as.numeric(X$value)
 Y = X %>% spread(reading, value)
