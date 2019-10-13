@@ -1,0 +1,49 @@
+Well	Strain	Control	Include	Isolate	Description
+A1	Blank	F	T		LB only
+A3	Blank	F	T		LB only
+A5	Blank	F	T		LB only
+A7	Blank	F	T		LB only
+A9	Blank	F	T		LB only
+A11	Blank	F	T		LB only
+B2	JEB 1203	F	T		Tech Repl 1
+B4	JEB 1203	F	T		Tech Repl 2
+B6	JEB 1203	F	T		Tech Repl 1
+B8	JEB 1203	F	T		Tech Repl 2
+B10	JEB 1203	F	T		Tech Repl 1
+B12	JEB 1203	F	T		Tech Repl 2
+C1	JEB 1203	F	T		Tech Repl 3
+C3	JEB 1205	F	T		Tech Repl 1
+C5	JEB 1203	F	T		Tech Repl 3
+C7	JEB 1205	F	T		Tech Repl 1
+C9	JEB 1203	F	T		Tech Repl 3
+C11	JEB 1205	F	T		Tech Repl 1
+D2	JEB 1205	F	T		Tech Repl 2
+D4	JEB 1205	F	T		Tech Repl 3
+D6	JEB 1205	F	T		Tech Repl 2
+D8	JEB 1205	F	T		Tech Repl 3
+D10	JEB 1205	F	T		Tech Repl 2
+D12	JEB 1205	F	T		Tech Repl 3
+E1	JEB 1206	F	T		Tech Repl 1
+E3	JEB 1206	F	T		Tech Repl 2
+E5	JEB 1206	F	T		Tech Repl 1
+E7	JEB 1206	F	T		Tech Repl 2
+E9	JEB 1206	F	T		Tech Repl 1
+E11	JEB 1206	F	T		Tech Repl 2
+F2	JEB 1207	F	T		Tech Repl 1
+F4	JEB 1207	F	T		Tech Repl 2
+F6	JEB 1207	F	T		Tech Repl 1
+F8	JEB 1207	F	T		Tech Repl 2
+F10	JEB 1207	F	T		Tech Repl 1
+F12	JEB 1207	F	T		Tech Repl 2
+G1	JEB 1207	F	T		Tech Repl 3
+G3	JEB 1208	F	T		Tech Repl 1
+G5	JEB 1207	F	T		Tech Repl 3
+G7	JEB 1208	F	T		Tech Repl 1
+G9	JEB 1207	F	T		Tech Repl 3
+G11	JEB 1208	F	T		Tech Repl 1
+H2	JEB 1208	F	T		Tech Repl 2
+H4	Blank	F	T		LB only
+H6	JEB 1208	F	T		Tech Repl 2
+H8	Blank	F	T		LB only
+H10	JEB 1208	F	T		Tech Repl 2
+H12	Blank	F	T		LB only
