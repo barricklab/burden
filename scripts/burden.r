@@ -44,7 +44,7 @@ suppressMessages(library(cowplot))
 # infinite loop so that you can see the actual fatal error
 
 fatal_error <- function(msg) {
-
+  
   message("======= FATAL ERROR=======")
   if (interactive()) {
     message(msg)
@@ -68,6 +68,7 @@ fatal_error <- function(msg) {
 
 default.minimum.OD = 0.0
 default.maximum.time = 600
+default.offset.readings.to.average.time.span.end = 60
 
 if (!exists("input.prefix")) {
   suppressMessages(library(optparse))
@@ -76,16 +77,18 @@ if (!exists("input.prefix")) {
                 help="Input file prefix. Expects to find the files <input>.metadata.tsv and <input>.measurement.tsv", metavar="input.csv"),
     make_option(c("-o", "--output"), type="character", default=NULL, 
                 help="Output file prefix. Output files of the form <output>.* will be created. If this option is not provided the input file prefix will be used.", metavar="output_prefix"),
+    make_option(c("-m", "--max-method"), type="numeric", default=2, 
+                help="Maximum picking method. 1=pick max growth rate time and use other rates at this same time. 2=pick maximum value of each curve at whatever time it occurs (may be different for growth rate and for fluorescence)", metavar="1/2"),
     make_option(c("-d", "--min-OD"), type="numeric", default=default.minimum.OD, 
                 help="Only use points with at least this minimum OD measurement", metavar="value"),
     make_option(c("-x", "--max-time"), type="numeric", default=default.maximum.time, 
                 help="Only consider data from the beginning of growth up to this time", metavar="value"),
-    make_option(c("-m", "--max-method"), type="character", default=2, 
-                help="Maximum picking method. 1=pick max growth rate time and use other rates at this same time. 2=pick maximum value of each curve at whatever time it occurs (may be different for growth rate and for fluorescence)", metavar="1/2"),
-    make_option(c("-p", "--no-plots"), type="bool", action="store_true", 
+    make_option(c("-e", "--avg-end-time"), type="numeric", default=default.offset.readings.to.average.time.span.end, 
+                help="Offset the readings of every well of a sample to the average value of all readings in all wells of a  sample over the interval from time zero up through and including this final time. Set to -1 to turn off this initial timepoint averaging.", metavar="value"),
+    make_option(c("-b", "--background"), type="character", default=NA, 
+                            help="Constant background measurements to subtract from measurements in place. Must be a comma-separated list with as many background values as there are measurements types. If this is not provided (the defaults), then the time course from BLANK wells is subtracted.", metavar="value1,value2,[value3]"),
+     make_option(c("-p", "--no-plots"), type="bool", action="store_true", 
                 help="Don't create plots for quicker execution.")
-    
-    #TODO: We need to make more options accessible at the command line
   )
   
   usage_string = paste(
@@ -120,6 +123,14 @@ if (!exists("input.prefix")) {
   
   if (!is.null(opt$'min-OD')) {
     minimum.OD = opt$'min-OD'
+  }
+  
+  if (!is.null(opt$'avg-end-time')) {
+    offset.readings.to.average.time.span.end = opt$'avg-end-time'
+  }
+  
+  if (!is.null(opt$'background')) {
+    set.background.string = opt$'background'
   }
   
 } else {
@@ -168,6 +179,16 @@ if (exists("maximum.time")) {
   option.maximum.time = default.maximum.time
 }
 
+if (exists("offset.readings.to.average.time.span.end")) {
+  options.offset.readings.to.average.time.span.end = offset.readings.to.average.time.span.end
+} else {
+  options.offset.readings.to.average.time.span.end = default.offset.readings.to.average.time.span.end
+}
+
+option.set.background.values = c()
+if (exists("set.background.string")) {
+  option.set.background.values = as.vector(strsplit(set.background.string, ",")[[1]])
+}
 
 ##############################################################
 #### Advanced options that are currently hard-coded
@@ -178,8 +199,14 @@ if (exists("maximum.time")) {
 num.readings = NA
 
 # Fix all initial measurements to be equal across all non-blank samples in a category
-offset.readings.to.average = T
-offset.readings.to.average.time.span = c(0,60)
+
+if (options.offset.readings.to.average.time.span.end >= 0) {
+  offset.readings.to.average = T
+} else {
+  offset.readings.to.average = F
+}
+
+offset.readings.to.average.time.span = c(0,options.offset.readings.to.average.time.span.end)
 
 # time.point.span should be an odd number 
 # time.point.delta is the number of points forward and back to use in the window for determining rates
@@ -271,20 +298,29 @@ sdf = add_setting(sdf, "Output Prefix", option.output.prefix)
 
 # Translate the method to something meaningful
 option.max.method.string = "unknown"
+
 if (option.max.method == 1) {
   option.max.method.string = "1 (Find time point with maximum growth rate. Report all rates at this time point.) [one time = max growth rate]"
 } else if (option.max.method == 2) {
-  option.max.method.string = "1 (Find time point with maximum rate and report that for each curve separately.) [multiple times = max of each curve]"  
+  option.max.method.string = "2 (Find time point with maximum rate and report that for each curve separately.) [multiple times = max of each curve]"  
 }
 sdf = add_setting(sdf, "Maximum Picking Method", option.max.method.string)
 
-sdf = add_setting(sdf, "Offset Readings to Average", offset.readings.to.average)
-sdf = add_setting(sdf, "Offset Readings to Average Time Span", 
+sdf = add_setting(sdf, "Offset Readings to Initial Average", offset.readings.to.average)
+sdf = add_setting(sdf, "Offset Readings to Initial Average Time Span", 
                   paste(offset.readings.to.average.time.span, collapse="-"))
 sdf = add_setting(sdf, "Minimum OD", option.minimum.OD)
 sdf = add_setting(sdf, "Maximum Time", option.maximum.time)
 sdf = add_setting(sdf, "Time Point Span", time.point.span)
 sdf = add_setting(sdf, "Time Point Delta", time.point.delta)
+
+option.use.blanks.for.background = T
+if (length(option.set.background.values) > 0) {
+  option.use.blanks.for.background = F
+}
+sdf = add_setting(sdf, "Use Blank Wells", option.use.blanks.for.background)
+sdf = add_setting(sdf, "Fixed Blank Values", paste0(option.set.background.values, "", collapse=","))
+
 sdf = add_setting(sdf, "No plots", option.no.plots)
 
 cat("=== SETTINGS ==\n")
@@ -295,7 +331,7 @@ print_settings_df(sdf)
 ##############################################################
 
 if (   !file.exists(paste0(option.input.prefix, ".measurements.csv")) 
-    && !file.exists(paste0(option.input.prefix, ".measurements.tsv")) ) {
+       && !file.exists(paste0(option.input.prefix, ".measurements.tsv")) ) {
   fatal_error(paste0("Could not find a valid measurements file. Tried:\n", paste0(option.input.prefix, ".measurements.csv"), "\n", paste0(option.input.prefix, ".measurements.tsv")))
 }
 
@@ -303,7 +339,7 @@ if (   !file.exists(paste0(option.input.prefix, ".metadata.csv"))
        && !file.exists(paste0(option.input.prefix, ".metadata.tsv")) ) {
   fatal_error(paste0("Could not find a valid measurements file. Tried:\n", paste0(option.input.prefix, ".measurements.csv"), "\n", paste0(option.input.prefix, ".measurements.tsv")))
 }
-  
+
 ##############################################################
 #### Input files existed, now create the plot directory and write  settings
 ##############################################################
@@ -343,10 +379,10 @@ if (all_data$X1[1] == "0s") {
                       "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12",
                       "G1", "G2", "G3", "G4", "G5", "G6", "G7", "G8", "G9", "G10", "G11", "G12",
                       "H1", "H2", "H3", "H4", "H5", "H6", "H7", "H8", "H9", "H10", "H11", "H12"
-                      )
-    
-    
-    
+  )
+  
+  
+  
 } else {
   names(all_data) = all_data[1,]
   all_data = all_data[-1,]
@@ -463,7 +499,6 @@ metadata$strain.isolate = sub("blank__NA", "blank", metadata$strain.isolate)
 
 write_csv( metadata, paste0(option.output.prefix, ".tidy.metadata.csv"))
 
-
 ##############################################################
 #### Combine tidy measurement and metadata files
 ##############################################################
@@ -487,55 +522,77 @@ Y = Y %>% filter(time.min != 0)
 #### * Subtracts the average of ALL blank wells at a given time from readings
 ##############################################################
 
-Y$GFP = as.numeric(Y$GFP)
-Y$OD = as.numeric(Y$OD)
-
-BG = Y %>% filter(strain=="blank")
-
-BG$well = droplevels(BG$well)
-
-if (!option.no.plots) {
-  plot1 = ggplot(BG, aes(time.min, OD, color=well)) + geom_point() 
-  plot2 = ggplot(BG, aes(time.min, GFP, color=well)) + geom_point() 
+if (!option.use.blanks.for.background) {
   
-  
-  if (num.readings == 2) {
-    p = grid.arrange(plot1, plot2, nrow=2)
-  } else if (num.readings == 3) {
-    plot3 = ggplot(BG, aes(time.min, other, color=well)) + geom_point() 
-    p = grid.arrange(plot1, plot2, plot3, nrow=3)
+  if (length(option.set.background.values) !=  num.readings) {
+    fatal_error("WARNING: The number of background values provided does not match the number of measurements.\n")
   }
   
-  ggsave(file.path(plot.directory, "background.pdf"), plot=p)
-}
-
-Z = Y
-if (num.readings== 3) {
+  Y$OD = as.numeric(Y$OD) - as.numeric(option.set.background.values[1])
+  Y$GFP = as.numeric(Y$GFP) - as.numeric(option.set.background.values[2])
   
-  BG.means = BG %>% group_by(time.min) %>% summarize(other.bg = mean(other), GFP.bg = mean(GFP), OD.bg = mean(OD))
+  if (num.readings == 3) {
+    Y$other = as.numeric(Y$other) - as.numeric(option.set.background.values[3])
+  }
   
-  Z = Z %>% left_join(BG.means, by="time.min")
+  Z = Y
   
-  Z$OD = Z$OD - Z$OD.bg
-  Z$GFP = Z$GFP - Z$GFP.bg
-  Z$other = Z$other - Z$other.bg
+} else {
   
-} else if (num.readings == 2) {
+  if ( nrow(metadata %>% filter(strain.isolate == "blank")) == 0) {
+    fatal_error("No blank wells are included. Check your metadata file or add the --background option.\n")
+  }
   
-  BG.means = BG %>% group_by(time.min) %>% summarize(GFP.bg = mean(GFP), OD.bg = mean(OD))
+  Y$GFP = as.numeric(Y$GFP)
+  Y$OD = as.numeric(Y$OD)
   
-  Z = Z %>% left_join(BG.means, by="time.min")
+  BG = Y %>% filter(strain=="blank")
   
-  Z$OD = Z$OD - Z$OD.bg
-  Z$GFP = Z$GFP - Z$GFP.bg
-
-}
-
-## There is an error in group_by with some versions of the tidyverse and it does
-## not average per time point and only gives an overall average
-
-if (nrow(BG.means)==1) {
-  fatal_error("Averaging the background per time point faied. Please update your tidyverse packages.\n   install.packages(\"tidyverse\")")
+  BG$well = droplevels(BG$well)
+  
+  if (!option.no.plots) {
+    plot1 = ggplot(BG, aes(time.min, OD, color=well)) + geom_point() 
+    plot2 = ggplot(BG, aes(time.min, GFP, color=well)) + geom_point() 
+    
+    
+    if (num.readings == 2) {
+      p = grid.arrange(plot1, plot2, nrow=2)
+    } else if (num.readings == 3) {
+      plot3 = ggplot(BG, aes(time.min, other, color=well)) + geom_point() 
+      p = grid.arrange(plot1, plot2, plot3, nrow=3)
+    }
+    
+    ggsave(file.path(plot.directory, "background.pdf"), plot=p)
+  }
+  
+  Z = Y
+  if (num.readings== 3) {
+    
+    BG.means = BG %>% group_by(time.min) %>% summarize(other.bg = mean(other), GFP.bg = mean(GFP), OD.bg = mean(OD))
+    
+    Z = Z %>% left_join(BG.means, by="time.min")
+    
+    Z$OD = Z$OD - Z$OD.bg
+    Z$GFP = Z$GFP - Z$GFP.bg
+    Z$other = Z$other - Z$other.bg
+    
+  } else if (num.readings == 2) {
+    
+    BG.means = BG %>% group_by(time.min) %>% summarize(GFP.bg = mean(GFP), OD.bg = mean(OD))
+    
+    Z = Z %>% left_join(BG.means, by="time.min")
+    
+    Z$OD = Z$OD - Z$OD.bg
+    Z$GFP = Z$GFP - Z$GFP.bg
+    
+  }
+  
+  ## There is an error in group_by with some versions of the tidyverse and it does
+  ## not average per time point and only gives an overall average
+  
+  if (nrow(BG.means)==1) {
+    fatal_error("Averaging the background per time point faied. Please update your tidyverse packages.\n   install.packages(\"tidyverse\")")
+  }
 }
 
 #Ditch the blanks here
@@ -561,7 +618,7 @@ if (offset.readings.to.average) {
     
     strain.means = ZZ %>% group_by(strain.isolate) %>% summarize(mean.strain.OD = mean(OD), mean.strain.GFP = mean(GFP))
     well.means = ZZ %>% group_by(well, strain.isolate) %>% summarize(mean.well.OD = mean(OD), mean.well.GFP = mean(GFP))
-  
+    
     well.means = well.means %>% left_join(strain.means, by="strain.isolate")
     
     well.means$well.OD.offset = well.means$mean.strain.OD - well.means$mean.well.OD
@@ -595,7 +652,7 @@ if (offset.readings.to.average) {
     Z$OD = Z$OD + Z$well.OD.offset
     Z$GFP = Z$GFP + Z$well.GFP.offset
     Z$other = Z$other + Z$well.other.offset
-
+    
   }
 }
 
@@ -693,7 +750,7 @@ for (strain.of.interest in unique(Z$strain.isolate) )
   #ggplot(fluorescence.data , aes(time.min, GFP.rate, color=well)) + scale_x_continuous(limits = c(0, 400)) +  geom_point() 
   
   #ggplot(fluorescence.data , aes(time.min, other.rate, color=well)) + scale_x_continuous(limits = c(0, 400)) +  geom_point() 
-
+  
   growth.rate.data$well = droplevels(growth.rate.data$well)
   
   strain.max.values = data.frame()
@@ -728,7 +785,7 @@ for (strain.of.interest in unique(Z$strain.isolate) )
       max.GFP.fluorescence.data.row$time.min[1] = NA
       
     }
-      
+    
     cat("Time of GFP production rate:", max.GFP.fluorescence.data.row$time.min[1], "min\n")
     cat("Max GFP production rate:", max.GFP.fluorescence.data.row$GFP.rate, "per hour\n")
     
@@ -750,38 +807,38 @@ for (strain.of.interest in unique(Z$strain.isolate) )
       cat("Max other production:", max.other.fluorescence.data.row$other.rate, "per hour\n")
     }
     
-  if (num.readings == 2) {
+    if (num.readings == 2) {
       
-    strain.max.values = bind_rows(strain.max.values, 
-                                  data.frame(
-                                    well = this.well,
-                                    growth.rate = max.growth.rate.row$specific.growth.rate,
-                                    GFP.rate = max.GFP.fluorescence.data.row$GFP.rate,
-                                    max.growth.rate.time = max.growth.rate.row$time.min[1],
-                                    max.GFP.rate.time = max.GFP.fluorescence.data.row$time.min[1]
-                                  )
-    )
-    
-   } else  if (num.readings == 3) {
+      strain.max.values = bind_rows(strain.max.values, 
+                                    data.frame(
+                                      well = this.well,
+                                      growth.rate = max.growth.rate.row$specific.growth.rate,
+                                      GFP.rate = max.GFP.fluorescence.data.row$GFP.rate,
+                                      max.growth.rate.time = max.growth.rate.row$time.min[1],
+                                      max.GFP.rate.time = max.GFP.fluorescence.data.row$time.min[1]
+                                    )
+      )
       
-    strain.max.values = bind_rows(strain.max.values, 
-                                  data.frame(
-                                    well = this.well,
-                                    growth.rate = max.growth.rate.row$specific.growth.rate,
-                                    GFP.rate = max.GFP.fluorescence.data.row$GFP.rate,
-                                    other.rate = max.other.fluorescence.data.row$other.rate,
-                                    max.growth.rate.time = max.growth.rate.row$time.min[1],
-                                    max.GFP.rate.time = max.GFP.fluorescence.data.row$time.min[1],
-                                    max.other.rate.time = max.other.fluorescence.data.row$time.min[1]
-                                  )
-    )
+    } else  if (num.readings == 3) {
+      
+      strain.max.values = bind_rows(strain.max.values, 
+                                    data.frame(
+                                      well = this.well,
+                                      growth.rate = max.growth.rate.row$specific.growth.rate,
+                                      GFP.rate = max.GFP.fluorescence.data.row$GFP.rate,
+                                      other.rate = max.other.fluorescence.data.row$other.rate,
+                                      max.growth.rate.time = max.growth.rate.row$time.min[1],
+                                      max.GFP.rate.time = max.GFP.fluorescence.data.row$time.min[1],
+                                      max.other.rate.time = max.other.fluorescence.data.row$time.min[1]
+                                    )
+      )
     }
   }
   
   cat("\n\n")
   cat("Growth rate:", mean(strain.max.values$growth.rate), "±", sd(strain.max.values$growth.rate), "\n")
   cat("GFP rate:", mean(strain.max.values$GFP.rate), "±", sd(strain.max.values$GFP.rate), "\n")
-
+  
   if (num.readings == 3) {
     cat("Other rate:", mean(strain.max.values$other.rate), "±", sd(strain.max.values$other.rate), "\n")
   }
@@ -791,42 +848,42 @@ for (strain.of.interest in unique(Z$strain.isolate) )
   if (num.readings == 2) {
     
     final.table.summary = bind_rows(final.table.summary, 
-                            data.frame(
-                              strain.isolate = strain.of.interest,
-                              replicates = nrow(strain.max.values),
-                              wells = paste(strain.max.values$well, collapse=","),
-                              growth.rate = mean(strain.max.values$growth.rate),
-                              growth.rate.sd = sd(strain.max.values$growth.rate),
-                              GFP.rate = mean(strain.max.values$GFP.rate),
-                              GFP.rate.sd = sd(strain.max.values$GFP.rate)
-                            )
+                                    data.frame(
+                                      strain.isolate = strain.of.interest,
+                                      replicates = nrow(strain.max.values),
+                                      wells = paste(strain.max.values$well, collapse=","),
+                                      growth.rate = mean(strain.max.values$growth.rate),
+                                      growth.rate.sd = sd(strain.max.values$growth.rate),
+                                      GFP.rate = mean(strain.max.values$GFP.rate),
+                                      GFP.rate.sd = sd(strain.max.values$GFP.rate)
+                                    )
     )
     
     final.table.all.wells = bind_rows(final.table.all.wells, 
-                            data.frame(
-                              strain.isolate = rep(strain.of.interest, nrow(strain.max.values)),
-                              well = strain.max.values$well,
-                              growth.rate = strain.max.values$growth.rate,
-                              GFP.rate = strain.max.values$GFP.rate,
-                              max.growth.rate.time = strain.max.values$max.growth.rate.time,
-                              max.GFP.rate.time = strain.max.values$max.GFP.rate.time
-                            )
+                                      data.frame(
+                                        strain.isolate = rep(strain.of.interest, nrow(strain.max.values)),
+                                        well = strain.max.values$well,
+                                        growth.rate = strain.max.values$growth.rate,
+                                        GFP.rate = strain.max.values$GFP.rate,
+                                        max.growth.rate.time = strain.max.values$max.growth.rate.time,
+                                        max.GFP.rate.time = strain.max.values$max.GFP.rate.time
+                                      )
     )
     
   } else  if (num.readings == 3) {
     
     final.table.summary = bind_rows(final.table.summary, 
-                            data.frame(
-                              strain.isolate = strain.of.interest,
-                              replicates = nrow(strain.max.values),
-                              wells = paste(strain.max.values$well, collapse=","),
-                              growth.rate = mean(strain.max.values$growth.rate),
-                              growth.rate.sd = sd(strain.max.values$growth.rate),
-                              GFP.rate = mean(strain.max.values$GFP.rate),
-                              GFP.rate.sd = sd(strain.max.values$GFP.rate),
-                              other.rate = mean(strain.max.values$other.rate),
-                              other.rate.sd = sd(strain.max.values$other.rate)
-                            )
+                                    data.frame(
+                                      strain.isolate = strain.of.interest,
+                                      replicates = nrow(strain.max.values),
+                                      wells = paste(strain.max.values$well, collapse=","),
+                                      growth.rate = mean(strain.max.values$growth.rate),
+                                      growth.rate.sd = sd(strain.max.values$growth.rate),
+                                      GFP.rate = mean(strain.max.values$GFP.rate),
+                                      GFP.rate.sd = sd(strain.max.values$GFP.rate),
+                                      other.rate = mean(strain.max.values$other.rate),
+                                      other.rate.sd = sd(strain.max.values$other.rate)
+                                    )
     )
     
     final.table.all.wells = bind_rows(final.table.all.wells, 
@@ -843,7 +900,7 @@ for (strain.of.interest in unique(Z$strain.isolate) )
     )
   }
   
-
+  
 }
 
 ##Split out strain and replicates, fix column order, sort rows
@@ -879,4 +936,4 @@ final.table.all.wells = final.table.all.wells %>% select(final.column.order) %>%
 ### Write both final tables
 write_csv(final.table.summary, paste0(option.output.prefix, ".rates.summary.csv"))
 write_csv(final.table.all.wells, paste0(option.output.prefix, ".rates.all.csv"))
-          
+
