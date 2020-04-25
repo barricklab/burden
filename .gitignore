@@ -37,3 +37,6 @@ vignettes/*.pdf
 
 #temporary plots
 Rplots.pdf
+
+#.ds_store files 
+.DS_Store
