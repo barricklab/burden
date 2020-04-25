@@ -26,7 +26,7 @@
     - XXX denotes unique experiment number/burden assay run  
 
 You will pipette 5µl of each culture in triplicate (for example: one culture is placed in G1, G5, G9, another culture is placed in G2, G6, G10, etc.), as displayed in the diagram below:  
-![sample microplate setup](https://github.com/barricklab/burden/images/sampleplate.png)   
+![sample microplate setup](https://github.com/barricklab/burden/blob/master/images/sampleplate.png)   
 
 3. First, prepare the Standard and Blank wells: 
    - Following the diagram shown above, pipette 5µl of each BFP standard (JEB1204-JEB1208) in triplicate (for example: one culture is placed in G1, G5, G9, another culture is placed in G2, G6, G10, etc.).
@@ -84,10 +84,10 @@ To analyze a single data set (from one burden assay), download the `burden_fit.R
          - `exp057.settings.csv`, a dataframe that prints out all of the options that were used in the fitting.
          - `exp057-plots` folder, which contains three types of files for each strain that was measured: 
             - `samplename.pdf`: A pdf with three plots, one for GFP, one for OD, and one for growth, all as a function of time. These plots were generated using the raw measurement values from the plate reader. 
-![sample rates plots output](https://github.com/barricklab/burden/images/sample.png)  
+![sample rates plots output](https://github.com/barricklab/burden/blob/master/images/sample.png)  
 
             - `samplename.rates.pdf`: A pdf with three plots, each graphing either the calculated ‘specific.growth.rate’, ‘GFP.rate’, or ‘other.rate’ values as a function of time, for each replicate corresponding to the sample:   
-![sample rates plots output](https://github.com/barricklab/burden/images/sample_rates.png)
+![sample rates plots output](https://github.com/barricklab/burden/blob/master/images/sample_rates.png)
 
 
          -  `exp057.tidy.metadata.csv` and `exp057.tidy.measurements.csv`- these are the products of the tidyr function, which cleaned up the metadata and measurement files that were initially imported into the script. 
@@ -111,13 +111,13 @@ To analyze a single data set (from one burden assay), download the `burden_fit.R
    
       - `exp057.rates.summary.growth_rates.pdf` and `exp057.rates.summary.growth_rates.html` - this plots the growth rate of each strain in the assay, with error bars representing the 95% confidence interval of the mean growth rate (mean of all replicates for each strain): 
       
-      ![](https://github.com/barricklab/burden/images/sample_summary_growth_rates.png)
+      ![](https://github.com/barricklab/burden/blob/master/images/sample_summary_growth_rates.png)
       
       
       
       - `exp057.rates.summary.burden_vs_growth_rates.pdf` and `exp057.rates.summary.burden_vs_growth_rates.html` - this linear regression plot graphs the mean GFP rate of each strain as a function of mean growth rate. Each point represents a different strain, and has error bars representing the 95% confidence interval for both variables (mean growth and GFP rates):  
       
-      ![](https://github.com/barricklab/burden/images/sample_burdenvsgrowth.png)
+      ![](https://github.com/barricklab/burden/blob/master/images/sample_burdenvsgrowth.png)
  
 
 
