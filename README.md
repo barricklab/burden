@@ -1,9 +1,7 @@
 # Burden Assay Protocol 
 
 
-1.	Retrieve and resuspend Biobrick kit distribution samples as described on iGEM webpage: http://parts.igem.org/Help:2019_DNA_Distribution
-
-2.	Transform 1 µl of resuspended BioBrick samples into a 50 µl aliquot of chemically competent burden monitor strain cells (CalCl2 chemical competent cells; burden monitor cells made as described in methods section). Incubate transformants overnight at 37C on LB agar plates supplemented with appropriate antibiotics: (1) 50 mg/mL Kanamycin (burden monitor strain is kanamycin-resistant), and (2) the antibiotic(s) in the Biobrick plasmid backbone. 
+1. Transform 1 µl of any plasmid of interest into a 50 µl aliquot of chemically competent burden monitor strain cells (CalCl2 chemical competent cells; burden monitor cells made as described in methods section). Incubate transformants overnight at 37C on LB agar plates supplemented with appropriate antibiotics: (1) 50 mg/mL Kanamycin (burden monitor strain is kanamycin-resistant), and (2) the antibiotic(s) in the Biobrick plasmid backbone. 
 
 3.	Pick an antibiotic-resistant colony from the plate and inoculate in a culture tube with 5 mL LB and appropriate antibiotics. Incubate overnight at 37C (~250rpm). If performing a burden assay the next day, prepare overnight cultures of JEB1204-JEB1208 (BFP control strains, inoculate in 5mL LB supplemented with 50 mg/mL Kanamycin + 20 mg/mL Chloramphenicol).  
 
@@ -22,7 +20,7 @@
 ### Steps for burden assay:  
 
  1.	Turn on the plate reader and let it heat to 37C. 
- 2.	Create a metadata file (named expXXX.metadata.csv) which will map out the samples in the plate. The file should follow the formatting shown in the image below.  Instuctions on metadata file setup (with examples) are found in the `examples` folder. 
+ 2.	Create a metadata file (named expXXX.metadata.csv) which will map out the samples in the plate. The file should follow the formatting shown in the image below.  Instuctions on metadata file setup are found in the `scripts` folder (https://github.com/barricklab/burden/tree/master/scripts), and sample metadata files are in the `examples/input` folder. 
     - XXX denotes unique experiment number/burden assay run  
 
 You will pipette 5µl of each culture in triplicate (for example: one culture is placed in G1, G5, G9, another culture is placed in G2, G6, G10, etc.), as displayed in the diagram below:  
@@ -55,6 +53,7 @@ You will pipette 5µl of each culture in triplicate (for example: one culture is
 
     - Name this folder “expXXX.” (Example: exp057)
       - Ensure that both the metadata and measurements files are saved with the .csv (or .tsv) file extension. 
+      - Examples of both file types are found in the `examples/input` folder. 
 
 11.	Next step: Data analysis (computational protocol). 
 
