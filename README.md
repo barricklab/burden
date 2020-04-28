@@ -20,8 +20,9 @@
 ### Steps for burden assay:  
 
  1.	Turn on the plate reader and let it heat to 37C. 
- 2.	Create a metadata file (named expXXX.metadata.csv) which will map out the samples in the plate. The file should follow the formatting shown in the image below.  Instuctions on metadata file setup are found in the `scripts` folder (https://github.com/barricklab/burden/tree/master/scripts), and sample metadata files are in the `examples/input` folder. 
+ 2.	Create a metadata file (named expXXX.metadata.csv) which will map out the samples in the plate. The file should follow the formatting shown in the image below.  Instuctions on metadata file format are found in the `scripts` folder (https://github.com/barricklab/burden/tree/master/scripts), and sample metadata files are in the `examples/input` folder. 
     - XXX denotes unique experiment number/burden assay run  
+    - See the script instructions for a full description of the input file formats and directions for running the scripts at the command line. 
 
 You will pipette 5µl of each culture in triplicate (for example: one culture is placed in G1, G5, G9, another culture is placed in G2, G6, G10, etc.), as displayed in the diagram below:  
 ![sample microplate setup](https://github.com/barricklab/burden/blob/master/images/sampleplate.png)   
@@ -64,7 +65,9 @@ You will pipette 5µl of each culture in triplicate (for example: one culture is
    - They need be saved with the .csv or .tsv file extension.  
    - (Note that the “XXX” should be a unique burden assay experiment number (such as exp001, exp002, etc). 
 
-To analyze a single data set (from one burden assay), download the `burden_fit.R` and  `burden_summary.R` scripts, found in the `scripts` folder. 
+1. To analyze a single data set (from one burden assay), download the `burden_fit.R` and  `burden_summary.R` scripts, found in the `scripts` folder. 
+
+   - See the script instructions (https://github.com/barricklab/burden/tree/master/scripts) for a full description of the input file formats and directions for running the scripts at the command line. 
 
 2. Open the `burden_fit.R` file on RStudio. 
 
