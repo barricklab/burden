@@ -1,7 +1,7 @@
 # Burden Assay Protocol 
 
 
-1. Transform 1 µl of any plasmid of interest into a 50 µl aliquot of chemically competent burden monitor strain cells (CalCl2 chemical competent cells; burden monitor cells made as described in methods section). Incubate transformants overnight at 37C on LB agar plates supplemented with appropriate antibiotics: (1) 50 mg/mL Kanamycin (burden monitor strain is kanamycin-resistant), and (2) the antibiotic(s) in the Biobrick plasmid backbone. 
+1. Transform 1 µl of any plasmid of interest into a 50 µl aliquot of chemically competent burden monitor strain cells (CalCl2 chemical competent cells; burden monitor cells made as described in methods section). Incubate transformants overnight at 37C on LB agar plates supplemented with appropriate antibiotics: (1) 50 mg/mL Kanamycin (burden monitor strain is kanamycin-resistant), and (2) the antibiotic(s) in the plasmid backbone. 
 
 3.	Pick an antibiotic-resistant colony from the plate and inoculate in a culture tube with 5 mL LB and appropriate antibiotics. Incubate overnight at 37C (~250rpm). If performing a burden assay the next day, prepare overnight cultures of JEB1204-JEB1208 (BFP control strains, inoculate in 5mL LB supplemented with 50 mg/mL Kanamycin + 20 mg/mL Chloramphenicol).  
 
@@ -12,7 +12,7 @@
 
 5.	Burden assay (adapted from Ceroni 2015): 
     - **Required materials:**
-        - Required samples: overnight cultures of JEB1204 – JEB1208, and any transformed BioBrick cultures. 
+        - Required samples: overnight cultures of JEB1204 – JEB1208, and any transformed plasmid cultures. 
         - Plate reader (we use Tecan Infinite Pro M200 Plate Reader)  
         - 96 well plate: Black with clear optical bottom and clear lid (we use Nunc™ MicroWell™ 96-Well Optical-Bottom Plates (Thermo Scientific Catalog Number 265301)). 
         - Preheated LB media
@@ -30,7 +30,7 @@ You will pipette 5µl of each culture in triplicate (for example: one culture is
    - Following the diagram shown above, pipette 5µl of each BFP standard (JEB1204-JEB1208) in triplicate (for example: one culture is placed in G1, G5, G9, another culture is placed in G2, G6, G10, etc.).
    - For Blanks (indicated by blue wells): just add 5µl LB  
 
-4. Load 5 µl of each “unique” transformed biobrick culture in triplicate.
+4. Load 5 µl of each “unique” transformatiion culture in triplicate.
    - This allows up to 23 unique strains to be measured per plate.
    - If you have less than 23 unique strains, load the rest of the wells with 5µl LB, and treat as blanks.  
 
