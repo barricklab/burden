@@ -78,7 +78,7 @@ You will pipette 5µl of each culture in triplicate (for example: one culture is
 
       - Example: `input.prefix = “exp057”`
 
-5.	If no errors occur, the expXXX folder should now have many new output files. An example output folder can be found in `examples/exp057`. 
+5.	If no errors occur, the expXXX folder should now have many new output files. An output folder for exp057 can be found in `examples/output`. 
 
       - *Example output files for exp057 (Anderson series of promoters with RFP)*: 
       
@@ -92,8 +92,8 @@ You will pipette 5µl of each culture in triplicate (for example: one culture is
 
 
          -  `exp057.tidy.metadata.csv` and `exp057.tidy.measurements.csv`- these are the products of the tidyr function, which cleaned up the metadata and measurement files that were initially imported into the script. 
-         - `exp057.rates.all.csv`, a file containing rate calculations (growth, GFP, and 'other') for all wells in the assay. The sample file can be found in the `examples/exp057`.
-         - `exp057.rates.summary.csv`, which reports the mean rate calculations (of all replicates) for each stain. In this file, each strain has a corresponding mean rate value (GFP, growth, 'other'), with the values of the standard deviations and upper/lower bounds of the 95% confidence intervals of the means. The sample file can be found in the `examples/exp057`.
+         - `exp057.rates.all.csv`, a file containing rate calculations (growth, GFP, and 'other') for all wells in the assay. The sample file can be found in the `examples/output`.
+         - `exp057.rates.summary.csv`, which reports the mean rate calculations (of all replicates) for each stain. In this file, each strain has a corresponding mean rate value (GFP, growth, 'other'), with the values of the standard deviations and upper/lower bounds of the 95% confidence intervals of the means. The sample file can be found in the `examples/output`.
          **This file will be used to generate the summary graphs for the burden assay (using the `burden_summary.R` script).**  
          
          
